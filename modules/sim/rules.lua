@@ -129,6 +129,8 @@ function M.send(st, id, bay_index)
 	bus.state = "to_bay"
 	bus.bay = bay_index
 	bus.hidden = false
+	st.seq = (st.seq or 0) + 1
+	bus.seq = st.seq -- boarding priority = tap order, never bay position or timing
 	st.bays[bay_index].bus = id
 	if bus.garage then
 		st.garages[bus.garage].current = nil
@@ -142,20 +144,25 @@ function M.arrive(st, id)
 	st.buses[id].state = "bay"
 end
 
--- Board the head passenger into the first matching bus in the bays (left to right).
--- Returns the bus id, or nil if the head has nowhere to go.
+-- Board the head passenger into the earliest-sent matching bus with free seats.
+-- If that bus is still driving in, the head waits for it: this keeps the outcome identical
+-- for a fast real-time player and for the instant solver.
+-- Returns the bus id, or nil if the head has nowhere to go (yet).
 function M.board_one(st)
 	local color = st.queue[st.head]
 	if not color then return nil end
+	local best
 	for _, bay in ipairs(st.bays) do
 		local bus = bay.bus and st.buses[bay.bus]
-		if bus and bus.state == "bay" and bus.color == color and bus.left > 0 then
-			bus.left = bus.left - 1
-			st.head = st.head + 1
-			if bus.left == 0 then bus.state = "full" end
-			return bus.id
+		if bus and (bus.state == "bay" or bus.state == "to_bay") and bus.color == color and bus.left > 0 then
+			if not best or bus.seq < best.seq then best = bus end
 		end
 	end
+	if not best or best.state ~= "bay" then return nil end
+	best.left = best.left - 1
+	st.head = st.head + 1
+	if best.left == 0 then best.state = "full" end
+	return best.id
 end
 
 function M.depart(st, id)

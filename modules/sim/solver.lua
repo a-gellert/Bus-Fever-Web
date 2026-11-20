@@ -29,6 +29,18 @@ local function clone(st)
 	return c -- queue is shared: nothing here mutates it
 end
 
+-- Copy of a live (real-time) state with every pending move finished: driving buses arrive,
+-- full buses leave. The solver works only on such settled states.
+function M.instant(st)
+	local s = clone(st)
+	for _, id in ipairs(s.order) do
+		local bus = s.buses[id]
+		if bus.state == "to_bay" then rules.arrive(s, id) end
+		if bus.state == "full" then rules.depart(s, id) end
+	end
+	return s
+end
+
 local function settle(st)
 	while true do
 		local id = rules.board_one(st)
@@ -39,7 +51,14 @@ end
 
 local function key(st)
 	local parts = { st.head }
-	for _, bay in ipairs(st.bays) do parts[#parts + 1] = bay.bus or 0 end
+	-- buses in bays in boarding-priority (tap) order; bay positions don't matter
+	local inbay = {}
+	for _, bay in ipairs(st.bays) do
+		if bay.bus then inbay[#inbay + 1] = st.buses[bay.bus] end
+	end
+	table.sort(inbay, function(a, b) return a.seq < b.seq end)
+	for _, b in ipairs(inbay) do parts[#parts + 1] = b.id .. ":" .. b.left end
+	parts[#parts + 1] = "|"
 	for _, id in ipairs(st.order) do
 		if st.buses[id].state == "lot" then parts[#parts + 1] = id end
 	end
@@ -54,11 +73,13 @@ local function urgency(st, bus)
 	return #st.queue
 end
 
--- Returns true (solved), false (proved unsolvable) or nil (budget exhausted); plus nodes visited.
+-- Returns true (solved), false (proved unsolvable) or nil (budget exhausted); nodes visited;
+-- and the winning tap order (bus ids) when solved.
 function M.solve(st, budget)
 	budget = budget or 20000
 	local nodes, seen = 0, {}
 	local exhausted = false
+	local plan = {}
 
 	local function dfs(s)
 		settle(s)
@@ -82,15 +103,49 @@ function M.solve(st, budget)
 			local n = clone(s)
 			rules.send(n, c.id, bay)
 			rules.arrive(n, c.id)
+			plan[#plan + 1] = c.id
 			if dfs(n) then return true end
+			plan[#plan] = nil
 			if exhausted then return false end
 		end
 		return false
 	end
 
-	local ok = dfs(clone(st))
+	local ok = dfs(M.instant(st))
 	if not ok and exhausted then return nil, nodes end
-	return ok, nodes
+	return ok, nodes, ok and plan or nil
+end
+
+-- Model of a casual but attentive player, for difficulty tuning (not a solver):
+-- among free vehicles picks the colour needed soonest in the next `look` passengers, with
+-- `noise` slots of misjudgement; hidden vehicles are unknown (scored as "later").
+-- Returns true if the level was cleared without boosters.
+function M.play_casual(st, rng, look, noise)
+	local s = M.instant(st)
+	look, noise = look or 40, noise or 8
+	while true do
+		settle(s)
+		if s.head > #s.queue then return true end
+		local bay = rules.free_bay(s, "open")
+		if not bay then return false end
+		local best, best_u
+		for _, id in ipairs(rules.parked(s)) do
+			if rules.exit_check(s, id) then
+				local bus = s.buses[id]
+				local u = look
+				if not bus.hidden then
+					for i = s.head, math.min(#s.queue, s.head + look - 1) do
+						if s.queue[i] == bus.color then u = i - s.head break end
+					end
+				end
+				u = u + rng:float() * noise
+				if not best_u or u < best_u then best, best_u = id, u end
+			end
+		end
+		if not best then return false end
+		rules.send(s, best, bay)
+		rules.arrive(s, best)
+	end
 end
 
 return M

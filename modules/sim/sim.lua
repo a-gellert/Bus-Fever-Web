@@ -4,6 +4,7 @@
 local config = require("modules.config")
 local rules = require("modules.sim.rules")
 local boosters = require("modules.sim.boosters")
+local solver = require("modules.sim.solver")
 
 local M = {}
 M.__index = M
@@ -15,6 +16,8 @@ function M.new(level, seed)
 	self.events = {}
 	self.timers = {}
 	self.board_acc = 0
+	-- long queues board faster so watching never drags (13..20 per second)
+	self.board_rate = config.BOARD_RATE + math.min(7, #level.queue / 60)
 	self.result = nil     -- "won" | "stuck" once reached
 	self.time = 0
 	return self
@@ -63,8 +66,10 @@ function M:tap(id)
 	dispatch(self, id, bay, "drive", config.DRIVE_TIME)
 end
 
--- Boosters: return true when applied (the caller spends the booster only then)
+-- Boosters: return true when applied (the caller spends the booster only then).
+-- Nothing changes after a win: "won" must fire exactly once.
 function M:use_vip(id)
+	if self.result == "won" then return false end
 	local bay = boosters.vip_target(self.st, id)
 	if not bay then return false end
 	dispatch(self, id, bay, "teleport", config.TELEPORT_TIME)
@@ -72,22 +77,35 @@ function M:use_vip(id)
 end
 
 function M:use_arrange()
-	if not boosters.arrange(self.st) then return false end
+	if self.result == "won" or not boosters.arrange(self.st) then return false end
 	push(self, { type = "queue_changed" })
 	self.result = nil
 	return true
 end
 
+-- Jumble must not turn a winnable position into a dead one: try a few shuffles,
+-- keep the first one the solver does not prove unsolvable.
 function M:use_jumble()
-	self.seed = self.seed + 7919
-	local changed = boosters.jumble(self.st, self.seed)
-	if not changed then return false end
-	push(self, { type = "recolor", buses = changed })
-	self.result = nil
-	return true
+	if self.result == "won" then return false end
+	local parked = rules.parked(self.st)
+	local before = {}
+	for _, id in ipairs(parked) do before[id] = self.st.buses[id].color end
+	for _ = 1, 6 do
+		self.seed = self.seed + 7919
+		local changed = boosters.jumble(self.st, self.seed)
+		if not changed then return false end
+		if solver.solve(self.st, 3000) ~= false then
+			push(self, { type = "recolor", buses = changed })
+			self.result = nil
+			return true
+		end
+		for id, c in pairs(before) do self.st.buses[id].color = c end
+	end
+	return false
 end
 
 function M:unlock_bay()
+	if self.result == "won" then return false end
 	local i = boosters.unlock_bay(self.st)
 	if not i then return false end
 	push(self, { type = "bay_unlocked", bay = i })
@@ -109,7 +127,7 @@ local function run_timers(self)
 end
 
 local function board(self, dt)
-	local step = 1 / config.BOARD_RATE
+	local step = 1 / self.board_rate
 	self.board_acc = self.board_acc + dt
 	while self.board_acc >= step do
 		local id = rules.board_one(self.st)
