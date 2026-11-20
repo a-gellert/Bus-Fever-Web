@@ -1,0 +1,217 @@
+-- Level controller: the only script with game flow. Wires sim (rules) <-> views <-> meta/platform.
+-- Owns input, level start/restart/advance, boosters, ads. Everything else lives in modules/.
+local config = require("modules.config")
+local levels = require("modules.meta.levels")
+local progress = require("modules.meta.progress")
+local ads = require("modules.platform.ads")
+local sim_mod = require("modules.sim.sim")
+local layout = require("modules.view.layout")
+local board_view = require("modules.view.board_view")
+local queue_view = require("modules.view.queue_view")
+local hud_mod = require("modules.view.hud")
+local palette = require("modules.view.palette")
+local audio = require("modules.view.audio")
+
+local TOUCH = hash("touch")
+local PASSENGER_FACTORY = "/level#passenger_factory"
+
+local function window_size()
+	local w, h = window.get_size()
+	return w, h
+end
+
+local function compute_layout(self)
+	local w, h = window_size()
+	return layout.compute(w, h, self.sim.st.lot, #self.sim.st.bays)
+end
+
+local function refresh_hud(self)
+	local s = {}
+	for _, name in ipairs({ "vip", "arrange", "jumble" }) do
+		local unlocked = progress.booster_unlocked(name)
+		local n = progress.booster_count(name)
+		local text = unlocked and (name:upper() .. " " .. (n > 0 and n or "+")) or ("Lv " .. config.BOOSTERS[name].unlock_level)
+		s[name] = { text = text, enabled = unlocked }
+	end
+	if self.vip_mode then s.vip = { text = "TAP BUS", enabled = true } end
+	s.restart = { text = "RESTART", enabled = true }
+	self.hud:set(s, "Level " .. self.number)
+end
+
+local function clear(self)
+	if self.board then self.board:delete() end
+	if self.queue then self.queue:delete() end
+	if self.hud then self.hud:hide_popup() end
+	self.board, self.queue = nil, nil
+end
+
+local function start(self, n)
+	clear(self)
+	self.number = n
+	self.sim = sim_mod.new(levels.get(n))
+	self.L = compute_layout(self)
+	self.board = board_view.new(self.sim.st, self.L)
+	self.queue = queue_view.new(self.sim.st, self.L, n % 2 == 0 and "ring" or "u")
+	self.hud = self.hud or hud_mod.new(self.L)
+	self.hud:relayout(self.L)
+	self.vip_mode = false
+	self.finished = false
+	self.streak, self.last_board = 0, 0
+	refresh_hud(self)
+	ads.measure("level", tostring(n), "start")
+end
+
+local function relayout(self)
+	if not self.sim then return end
+	self.L = compute_layout(self)
+	self.board:relayout(self.L)
+	self.queue:relayout(self.L)
+	self.hud:relayout(self.L)
+end
+
+-- Spend a booster; with none left a rewarded ad grants one. then(ok) runs the effect.
+local function with_booster(self, name, apply)
+	if progress.booster_count(name) > 0 then
+		if apply() then progress.spend_booster(name) end
+		refresh_hud(self)
+		return
+	end
+	ads.rewarded(function(ok)
+		if ok then
+			progress.add_booster(name, 1)
+			if apply() then progress.spend_booster(name) end
+		end
+		refresh_hud(self)
+	end)
+end
+
+local function rescue_options(self)
+	local st = self.sim.st
+	local opts = {}
+	for _, bay in ipairs(st.bays) do
+		if bay.kind == "locked" then
+			opts[#opts + 1] = { action = "rescue_bay", text = "+1 SLOT (AD)" }
+			break
+		end
+	end
+	if #opts == 0 and progress.booster_unlocked("vip") then
+		opts[#opts + 1] = { action = "rescue_vip", text = "VIP RESCUE (AD)" }
+	end
+	opts[#opts + 1] = { action = "restart", text = "RESTART" }
+	return opts
+end
+
+local function on_action(self, action)
+	if action == "restart" then
+		self.hud:hide_popup()
+		ads.measure("level", tostring(self.number), "restart")
+		start(self, self.number)
+	elseif action == "vip" then
+		self.vip_mode = not self.vip_mode
+		refresh_hud(self)
+	elseif action == "arrange" then
+		with_booster(self, "arrange", function() return self.sim:use_arrange() end)
+	elseif action == "jumble" then
+		with_booster(self, "jumble", function() return self.sim:use_jumble() end)
+	elseif action == "rescue_bay" then
+		ads.rewarded(function(ok)
+			if ok then
+				self.hud:hide_popup()
+				self.sim:unlock_bay()
+			end
+		end)
+	elseif action == "rescue_vip" then
+		ads.rewarded(function(ok)
+			if ok then
+				self.hud:hide_popup()
+				progress.add_booster("vip", 1)
+				self.vip_mode = true
+				refresh_hud(self)
+			end
+		end)
+	end
+end
+
+local function jump(self, bus_id, color)
+	local from = self.queue:head_pos()
+	local to = self.board:bus_world_pos(bus_id)
+	to.z = from.z
+	local id = factory.create(PASSENGER_FACTORY, from)
+	local s = self.queue.size / 32
+	go.set(msg.url(nil, id, "sprite"), "scale", vmath.vector3(s, s, 1))
+	go.set(msg.url(nil, id, "sprite"), "tint", palette.of(color))
+	go.animate(id, "position", go.PLAYBACK_ONCE_FORWARD, to, go.EASING_INQUAD, 0.12, 0, function() go.delete(id) end)
+end
+
+local function on_event(self, ev)
+	self.board:on_event(ev)
+	local t = ev.type
+	if t == "board" then
+		self.queue:on_board()
+		jump(self, ev.bus, ev.color)
+		local now = self.sim.time
+		self.streak = (now - self.last_board < 0.3) and math.min(self.streak + 1, 20) or 0
+		self.last_board = now
+		audio.play("board", 1 + self.streak * 0.05)
+	elseif t == "won" and not self.finished then
+		self.finished = true
+		ads.gameplay_stop()
+		ads.measure("level", tostring(self.number), "complete")
+		audio.play("win")
+		progress.complete_level()
+		timer.delay(config.NEXT_LEVEL_DELAY, false, function()
+			ads.level_break(self.number, function() start(self, progress.level()) end)
+		end)
+	elseif t == "stuck" then
+		ads.measure("level", tostring(self.number), "stuck")
+		self.hud:show_popup(rescue_options(self))
+	end
+end
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+	progress.load()
+	ads.set_hooks(function() audio.set_muted(true) end, function() audio.set_muted(false) end)
+	window.set_listener(function(_, event)
+		if event == window.WINDOW_EVENT_RESIZED then relayout(self) end
+	end)
+	-- dev: dmengine --config=bus.start_level=18 opens any level without touching the save
+	local dev_level = sys.get_config_int("bus.start_level", 0)
+	start(self, dev_level > 0 and dev_level or progress.level())
+end
+
+function update(self, dt)
+	if ads.is_ad_active() or not self.sim then return end
+	self.sim:update(dt)
+	for _, ev in ipairs(self.sim:drain()) do on_event(self, ev) end
+	self.queue:update(dt)
+end
+
+function on_input(self, action_id, action)
+	if action_id ~= TOUCH or not action.pressed or ads.is_ad_active() then return end
+	ads.gameplay_start()
+	local x, y = action.screen_x, action.screen_y
+
+	local act = self.hud:pick(x, y)
+	if act then
+		if act ~= "popup_miss" then on_action(self, act) end
+		return true
+	end
+
+	local bay = self.board:pick_bay(x, y)
+	if bay and self.sim.st.bays[bay].kind == "locked" then
+		ads.rewarded(function(ok) if ok then self.sim:unlock_bay() end end)
+		return true
+	end
+
+	local bus = self.board:pick(x, y)
+	if not bus then return end
+	if self.vip_mode then
+		with_booster(self, "vip", function() return self.sim:use_vip(bus) end)
+		self.vip_mode = false
+		refresh_hud(self)
+	else
+		self.sim:tap(bus)
+	end
+	return true
+end

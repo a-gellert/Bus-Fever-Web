@@ -1,0 +1,11 @@
+name: "bus"
+instances {
+  id: "root"
+  prototype: "/entities/bus/bus_root.go"
+  children: "body"
+}
+instances {
+  id: "body"
+  prototype: "/entities/bus/bus_body.go"
+}
+scale_along_z: 0

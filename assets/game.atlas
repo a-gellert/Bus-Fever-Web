@@ -1,0 +1,13 @@
+images {
+  image: "/assets/images/bus.png"
+}
+images {
+  image: "/assets/images/arrow.png"
+}
+images {
+  image: "/assets/images/dot.png"
+}
+images {
+  image: "/assets/images/round.png"
+}
+extrude_borders: 2

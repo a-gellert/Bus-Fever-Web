@@ -1,0 +1,39 @@
+[bootstrap]
+main_collection = /main/main.collectionc
+render = /main/render/game.renderc
+
+[script]
+shared_state = 1
+
+[display]
+width = 540
+height = 960
+high_dpi = 1
+
+[android]
+input_method = HiddenInputField
+
+[html5]
+scale_mode = stretch
+wasm_streaming = 1
+show_fullscreen_button = 0
+show_made_with_defold = 0
+
+[project]
+title = Bus
+dependencies#0 = https://github.com/defold/extension-poki-sdk/archive/refs/heads/main.zip
+
+[collection]
+max_instances = 4096
+
+[sprite]
+max_count = 2048
+
+[label]
+max_count = 512
+
+[factory]
+max_count = 16
+
+[collection_factory]
+max_count = 16
