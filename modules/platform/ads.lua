@@ -11,6 +11,8 @@ local on_pause, on_resume -- hooks for audio/sim pause, set by the game
 
 local function sdk() return rawget(_G, "poki_sdk") end
 
+function M.now() return (socket and socket.gettime) and socket.gettime() or os.time() end
+
 function M.set_hooks(pause, resume) on_pause, on_resume = pause, resume end
 
 function M.is_ad_active() return ad_active end
@@ -49,8 +51,8 @@ end
 -- Natural break between levels: only from INTERSTITIAL_FROM_LEVEL and not more often than MIN_GAP
 function M.level_break(level, done)
 	local s = sdk()
-	local now = socket and socket.gettime and socket.gettime() or os.time()
-	if not s or level < config.INTERSTITIAL_FROM_LEVEL or now - last_break < config.INTERSTITIAL_MIN_GAP then
+	local now = M.now()
+	if ad_active or not s or level < config.INTERSTITIAL_FROM_LEVEL or now - last_break < config.INTERSTITIAL_MIN_GAP then
 		done()
 		return
 	end
@@ -73,6 +75,8 @@ function M.rewarded(done, size)
 		done(true)
 		return
 	end
+	if ad_active then return done(false) end
+	last_break = M.now() -- a rewarded video also counts as the break: no interstitial right after it
 	begin_ad()
 	local finished = false
 	s.rewarded_break(size or "small", function(_, status)

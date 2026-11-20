@@ -45,18 +45,18 @@ end
 M.SHAPES = {
 	-- horseshoe: up the left, over the top, down the right, into the stop
 	u = function()
-		local p = { { 0.12, 0.1 } }
+		local p = { { 0.12, 0.16 } }
 		arc(p, 0.5, 0.55, 0.38, 0.35, math.pi, 0, 24)
-		p[#p + 1] = { 0.88, 0.3 }
-		arc(p, 0.66, 0.3, 0.22, 0.22, 0, -math.pi * 0.5, 8)
-		p[#p + 1] = { 0.5, 0.08 }
+		p[#p + 1] = { 0.88, 0.35 }
+		arc(p, 0.66, 0.35, 0.22, 0.22, 0, -math.pi * 0.5, 8)
+		p[#p + 1] = { 0.5, 0.13 }
 		return p
 	end,
 	-- full ring that unwinds into the stop
 	ring = function()
 		local p = {}
-		arc(p, 0.5, 0.55, 0.4, 0.38, math.pi * 1.5 + 0.3, -math.pi * 0.5 + 0.3 - 2 * math.pi, 40)
-		p[#p + 1] = { 0.5, 0.08 }
+		arc(p, 0.5, 0.56, 0.4, 0.38, math.pi * 1.5 + 0.4, math.pi * 1.5 + 0.4 - 2 * math.pi + 0.8, 40) -- one turn, gap at the bottom
+		p[#p + 1] = { 0.5, 0.1 }
 		return p
 	end,
 }

@@ -20,3 +20,9 @@ embedded_components {
   data: "prototype: \"/entities/passenger/passenger.go\"\n"
   ""
 }
+embedded_components {
+  id: "panel_factory"
+  type: "factory"
+  data: "prototype: \"/entities/panel/panel.go\"\n"
+  ""
+}

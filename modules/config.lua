@@ -22,7 +22,7 @@ M.TELEPORT_TIME = 0.30    -- VIP booster
 M.BOARD_RATE = 13         -- passengers per second ("machine-gun" boarding)
 M.DEPART_DELAY = 0.15     -- full bus waits, then leaves
 M.DEPART_TIME = 0.40
-M.NEXT_LEVEL_DELAY = 0.5  -- seamless auto-advance
+M.NEXT_LEVEL_DELAY = 1.0  -- banner + confetti, then auto-advance
 
 -- Boosters: level from which each one unlocks, and free starting stock
 M.BOOSTERS = {

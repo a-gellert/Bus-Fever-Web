@@ -3,7 +3,7 @@
 local M = {}
 
 -- add a name here when its sound component is added to /audio
-M.SOUNDS = {}  -- e.g. honk = true, board = true, depart = true, win = true
+M.SOUNDS = { board = true, deny = true, depart = true, go = true, honk = true, stuck = true, tap = true, unlock = true, vip = true, win = true, }
 
 local muted = false
 

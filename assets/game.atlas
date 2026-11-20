@@ -1,13 +1,55 @@
 images {
+  image: "/assets/images/arrow.png"
+}
+images {
+  image: "/assets/images/backdrop.png"
+}
+images {
   image: "/assets/images/bus.png"
 }
 images {
-  image: "/assets/images/arrow.png"
+  image: "/assets/images/disc.png"
 }
 images {
   image: "/assets/images/dot.png"
 }
 images {
+  image: "/assets/images/garage.png"
+}
+images {
+  image: "/assets/images/hand.png"
+}
+images {
+  image: "/assets/images/icon_ad.png"
+}
+images {
+  image: "/assets/images/icon_arrange.png"
+}
+images {
+  image: "/assets/images/icon_jumble.png"
+}
+images {
+  image: "/assets/images/icon_lock.png"
+}
+images {
+  image: "/assets/images/icon_restart.png"
+}
+images {
+  image: "/assets/images/icon_vip.png"
+}
+images {
+  image: "/assets/images/ring.png"
+}
+images {
   image: "/assets/images/round.png"
+}
+images {
+  image: "/assets/images/shadow.png"
+}
+images {
+  image: "/assets/images/slot.png"
+}
+images {
+  image: "/assets/images/spark.png"
 }
 extrude_borders: 2

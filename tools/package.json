@@ -7,6 +7,7 @@
     "placeholders": "node gen_placeholders.js"
   },
   "devDependencies": {
-    "fengari": "0.1.4"
+    "fengari": "0.1.4",
+    "puppeteer-core": "^22.15.0"
   }
 }

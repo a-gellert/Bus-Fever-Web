@@ -49,8 +49,9 @@ local function dispatch(self, id, bay, kind, travel)
 	self.result = nil
 end
 
--- Player tapped a bus in the lot
-function M:tap(id)
+-- Player tapped a bus in the lot. `travel(bay)` (optional, from the view) returns the drive time
+-- for the real route, so passengers board when the bus visibly arrives.
+function M:tap(id, travel)
 	local bus = self.st.buses[id]
 	if not bus or bus.state ~= "lot" or self.result == "won" then return end
 	local free, blocker, dist = rules.exit_check(self.st, id)
@@ -63,7 +64,7 @@ function M:tap(id)
 		push(self, { type = "no_bay", bus = id })
 		return
 	end
-	dispatch(self, id, bay, "drive", config.DRIVE_TIME)
+	dispatch(self, id, bay, "drive", travel and travel(bay) or config.DRIVE_TIME)
 end
 
 -- Boosters: return true when applied (the caller spends the booster only then).

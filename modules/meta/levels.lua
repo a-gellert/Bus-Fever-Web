@@ -9,6 +9,10 @@ local M = {}
 
 M.HANDMADE = {}
 
+-- per-level seed offsets picked by tools/tune_levels.lua (missing file or level = raw seed)
+local ok_seeds, seeds = pcall(require, "modules.meta.level_seeds")
+M.SEEDS = ok_seeds and seeds or {}
+
 -- 0..1 inside a 5-level tooth: 3 rising, 4 = peak, 5 = breather
 local TOOTH = { 0.2, 0.4, 0.6, 1.0, 0.0 }
 
@@ -39,7 +43,7 @@ function M.params(n)
 	local d, t, peak = M.difficulty(n)
 	local wide = peak and n >= 30 -- 3 vehicles mixed in the queue: only late peaks, with a 5th bay
 	local p = {
-		seed = 1000 + n * 7717,
+		seed = 1000 + n * 7717 + (M.SEEDS[n] or 0),
 		template = n <= 3 and "grid" or SHAPES[(n - 1) % #SHAPES + 1],
 		count = math.min(MAX_COUNT, math.floor(14 + d * 22)),
 		colors = math.min(7, math.floor(3 + d * 4.5)),
@@ -58,6 +62,14 @@ function M.params(n)
 		p.count, p.colors = intro.count, intro.colors
 		p.window = n <= 3 and 1 or 2
 		p.hidden = 0
+	end
+	-- smaller lot for small levels: bigger, friendlier vehicles on screen
+	if p.count <= 10 then
+		p.lot = { w = 9, h = 11 }
+	elseif p.count <= 17 then
+		p.lot = { w = 11, h = 14 }
+	else
+		p.lot = { w = 13, h = 17 }
 	end
 	return p
 end

@@ -1,53 +1,87 @@
 -- Level controller: the only script with game flow. Wires sim (rules) <-> views <-> meta/platform.
--- Owns input, level start/restart/advance, boosters, ads. Everything else lives in modules/.
+-- Owns input, level start/restart/advance, boosters, rescue, ads, tutorial. Everything else lives in modules/.
 local config = require("modules.config")
 local levels = require("modules.meta.levels")
 local progress = require("modules.meta.progress")
 local ads = require("modules.platform.ads")
 local sim_mod = require("modules.sim.sim")
+local rules = require("modules.sim.rules")
+local solver = require("modules.sim.solver")
 local layout = require("modules.view.layout")
 local board_view = require("modules.view.board_view")
 local queue_view = require("modules.view.queue_view")
 local hud_mod = require("modules.view.hud")
 local palette = require("modules.view.palette")
 local audio = require("modules.view.audio")
+local juice = require("modules.view.juice")
 
 local TOUCH = hash("touch")
 local PASSENGER_FACTORY = "/level#passenger_factory"
-
-local function window_size()
-	local w, h = window.get_size()
-	return w, h
-end
+local TILE_FACTORY = "/level#tile_factory"
+local FREE_RESCUE_UNTIL = 6 -- levels with one free "+1 slot" rescue
+local on_stuck -- defined below; rescue paths reopen the popup when a rescue fails
 
 local function compute_layout(self)
-	local w, h = window_size()
+	local w, h = window.get_size()
 	return layout.compute(w, h, self.sim.st.lot, #self.sim.st.bays)
 end
 
 local function refresh_hud(self)
 	local s = {}
-	for _, name in ipairs({ "vip", "arrange", "jumble" }) do
-		local unlocked = progress.booster_unlocked(name)
-		local n = progress.booster_count(name)
-		local text = unlocked and (name:upper() .. " " .. (n > 0 and n or "+")) or ("Lv " .. config.BOOSTERS[name].unlock_level)
-		s[name] = { text = text, enabled = unlocked }
+	for _, name in ipairs(hud_mod.BOOSTERS) do
+		s[name] = {
+			count = progress.booster_count(name),
+			unlocked = progress.booster_unlocked(name, self.number),
+			unlock_level = config.BOOSTERS[name].unlock_level,
+			active = name == "vip" and self.vip_mode,
+		}
 	end
-	if self.vip_mode then s.vip = { text = "TAP BUS", enabled = true } end
-	s.restart = { text = "RESTART", enabled = true }
-	self.hud:set(s, "Level " .. self.number)
+	self.hud:set(s, "LEVEL " .. self.number)
+end
+
+local IDLE_HINT = 7        -- seconds without a tap before the hand shows a good move
+local IDLE_HINT_UNTIL = 10 -- levels with idle hints
+
+-- Tutorial (levels 1-2 until done) and idle hints: point at a free bus the queue head needs
+local function update_tutorial(self)
+	local tutorial = self.number <= 2 and not progress.tutorial_done()
+	local idle = self.number <= IDLE_HINT_UNTIL and (self.idle or 0) > IDLE_HINT
+	if not (tutorial or idle) or self.hud:is_modal() or self.finished then
+		self.hud:point(nil)
+		return
+	end
+	local st = self.sim.st
+	local head = st.queue[st.head]
+	for _, bay in ipairs(st.bays) do
+		local b = bay.bus and st.buses[bay.bus]
+		if b and b.color == head and b.left > 0 then
+			self.hud:point(nil) -- the right bus is already there: let them watch
+			return
+		end
+	end
+	for _, id in ipairs(rules.parked(st)) do
+		local bus = st.buses[id]
+		if bus.color == head and rules.exit_check(st, id) then
+			local p = self.board:bus_world_pos(id)
+			self.hud:point(p.x, p.y)
+			return
+		end
+	end
+	self.hud:point(nil)
 end
 
 local function clear(self)
 	if self.board then self.board:delete() end
 	if self.queue then self.queue:delete() end
-	if self.hud then self.hud:hide_popup() end
+	if self.hud then self.hud:hide_popup(true); self.hud:point(nil) end
 	self.board, self.queue = nil, nil
 end
 
 local function start(self, n)
 	clear(self)
 	self.number = n
+	self.run = (self.run or 0) + 1 -- stale timers compare against this
+	self.idle = 0
 	self.sim = sim_mod.new(levels.get(n))
 	self.L = compute_layout(self)
 	self.board = board_view.new(self.sim.st, self.L)
@@ -56,8 +90,22 @@ local function start(self, n)
 	self.hud:relayout(self.L)
 	self.vip_mode = false
 	self.finished = false
+	self.free_rescue = n <= FREE_RESCUE_UNTIL
 	self.streak, self.last_board = 0, 0
 	refresh_hud(self)
+	update_tutorial(self)
+	self.board:mark_free()
+	if self.autoplay then -- dev: play the solver plan (headless smoke tests)
+		local _, _, plan = solver.solve(self.sim.st, 30000)
+		self.plan, self.plan_i, self.auto_t = plan or {}, 1, 0
+	end
+	if self.intro_shown ~= n then -- once per level, not on every restart
+		self.intro_shown = n
+		if n == 1 then self.hud:banner("MATCH THE COLOURS!", palette.CREAM) end
+		for _, b in pairs(config.BOOSTERS) do
+			if n == b.unlock_level then self.hud:banner("NEW BOOSTER!", palette.GOLD) end
+		end
+	end
 	ads.measure("level", tostring(n), "start")
 end
 
@@ -67,45 +115,117 @@ local function relayout(self)
 	self.board:relayout(self.L)
 	self.queue:relayout(self.L)
 	self.hud:relayout(self.L)
+	update_tutorial(self)
+	self.board:mark_free()
 end
 
--- Spend a booster; with none left a rewarded ad grants one. then(ok) runs the effect.
+local function set_modal(self, title, options)
+	self.board:set_labels(false)
+	self.board:warn(false)
+	self.queue:set_counter_visible(false)
+	self.hud:point(nil)
+	self.hud:show_popup(title, options)
+end
+
+local function close_modal(self)
+	self.hud:hide_popup()
+	self.board:set_labels(true)
+	self.queue:set_counter_visible(true)
+	update_tutorial(self)
+end
+
+local function offer_bay(self)
+	set_modal(self, "WATCH A VIDEO?", {
+		{ action = "confirm_bay", text = "+1 PARKING SLOT", icon = "icon_ad" },
+		{ action = "close", text = "NO THANKS", tint = palette.BUTTON_NEUTRAL },
+	})
+end
+
+-- Out of Spots must never end without a popup: a failed or declined rescue brings it back
+local function reopen_if_stuck(self)
+	if self.sim.result == "stuck" and not self.finished and not self.hud:is_modal() and not self.vip_mode then
+		on_stuck(self)
+	end
+end
+
+-- Spend a booster; with none in stock a rewarded ad grants one. apply() runs the effect.
 local function with_booster(self, name, apply)
 	if progress.booster_count(name) > 0 then
-		if apply() then progress.spend_booster(name) end
+		if apply() then
+			progress.spend_booster(name)
+			ads.measure("booster", name, "used")
+		end
 		refresh_hud(self)
+		reopen_if_stuck(self)
 		return
 	end
 	ads.rewarded(function(ok)
-		if ok then
+		if ok and not self.finished then
 			progress.add_booster(name, 1)
-			if apply() then progress.spend_booster(name) end
+			if apply() then
+				progress.spend_booster(name)
+				ads.measure("booster", name, "used")
+			end
 		end
 		refresh_hud(self)
+		reopen_if_stuck(self)
 	end)
+end
+
+local function has_locked_bay(self)
+	for _, bay in ipairs(self.sim.st.bays) do
+		if bay.kind == "locked" then return true end
+	end
+	return false
+end
+
+local function stock_text(name, label)
+	local n = progress.booster_count(name)
+	if n > 0 then return label .. " (" .. n .. ")", nil end
+	return label, "icon_ad" -- none in stock: a video gives one
 end
 
 local function rescue_options(self)
 	local st = self.sim.st
 	local opts = {}
-	for _, bay in ipairs(st.bays) do
-		if bay.kind == "locked" then
-			opts[#opts + 1] = { action = "rescue_bay", text = "+1 SLOT (AD)" }
-			break
+	if has_locked_bay(self) then
+		if self.free_rescue then
+			opts[#opts + 1] = { action = "rescue_free", text = "+1 SLOT  FREE" }
+		else
+			opts[#opts + 1] = { action = "rescue_bay", text = "+1 SLOT", icon = "icon_ad" }
 		end
 	end
-	if #opts == 0 and progress.booster_unlocked("vip") then
-		opts[#opts + 1] = { action = "rescue_vip", text = "VIP RESCUE (AD)" }
+	if progress.booster_unlocked("arrange", self.number) then
+		local text, icon = stock_text("arrange", "SORT QUEUE")
+		opts[#opts + 1] = { action = "rescue_arrange", text = text, icon = icon }
 	end
-	opts[#opts + 1] = { action = "restart", text = "RESTART" }
+	if progress.booster_unlocked("vip", self.number) and rules.free_bay(st, "vip") then
+		local text, icon = stock_text("vip", "VIP BUS")
+		opts[#opts + 1] = { action = "rescue_vip", text = text, icon = icon }
+	end
+	opts[#opts + 1] = { action = "restart", text = "RESTART", tint = palette.BUTTON_NEUTRAL }
 	return opts
+end
+
+on_stuck = function(self)
+	print("[game] out_of_spots " .. self.number)
+	ads.gameplay_stop()
+	ads.measure("level", tostring(self.number), "stuck")
+	audio.play("stuck")
+	set_modal(self, "OUT OF SPOTS!", rescue_options(self))
+end
+
+local function rescued(self, how)
+	ads.measure("rescue", how, "used")
+	close_modal(self)
 end
 
 local function on_action(self, action)
 	if action == "restart" then
-		self.hud:hide_popup()
 		ads.measure("level", tostring(self.number), "restart")
 		start(self, self.number)
+	elseif action == "close" then
+		close_modal(self)
 	elseif action == "vip" then
 		self.vip_mode = not self.vip_mode
 		refresh_hud(self)
@@ -113,22 +233,41 @@ local function on_action(self, action)
 		with_booster(self, "arrange", function() return self.sim:use_arrange() end)
 	elseif action == "jumble" then
 		with_booster(self, "jumble", function() return self.sim:use_jumble() end)
-	elseif action == "rescue_bay" then
+	elseif action == "rescue_free" then
+		self.free_rescue = false
+		self.sim:unlock_bay()
+		rescued(self, "free_bay")
+	elseif action == "rescue_bay" or action == "confirm_bay" then
 		ads.rewarded(function(ok)
-			if ok then
-				self.hud:hide_popup()
+			if ok and not self.finished then
 				self.sim:unlock_bay()
+				if self.hud:is_modal() then rescued(self, "ad_bay") end
+			elseif self.hud:is_modal() and action == "confirm_bay" then
+				close_modal(self)
 			end
 		end)
+	elseif action == "rescue_arrange" then
+		close_modal(self)
+		with_booster(self, "arrange", function() return self.sim:use_arrange() end)
 	elseif action == "rescue_vip" then
-		ads.rewarded(function(ok)
-			if ok then
-				self.hud:hide_popup()
-				progress.add_booster("vip", 1)
-				self.vip_mode = true
-				refresh_hud(self)
-			end
-		end)
+		close_modal(self)
+		local function arm()
+			self.vip_mode = true
+			refresh_hud(self)
+			self.hud:banner("TAP ANY BUS", palette.GOLD)
+		end
+		if progress.booster_count("vip") > 0 then
+			arm()
+		else
+			ads.rewarded(function(ok)
+				if ok and not self.finished then
+					progress.add_booster("vip", 1)
+					arm()
+				else
+					reopen_if_stuck(self)
+				end
+			end)
+		end
 	end
 end
 
@@ -140,7 +279,38 @@ local function jump(self, bus_id, color)
 	local s = self.queue.size / 32
 	go.set(msg.url(nil, id, "sprite"), "scale", vmath.vector3(s, s, 1))
 	go.set(msg.url(nil, id, "sprite"), "tint", palette.of(color))
-	go.animate(id, "position", go.PLAYBACK_ONCE_FORWARD, to, go.EASING_INQUAD, 0.12, 0, function() go.delete(id) end)
+	-- hop: up a little, then dive into the bus while shrinking
+	local t = 0.16
+	go.animate(id, "position.x", go.PLAYBACK_ONCE_FORWARD, to.x, go.EASING_LINEAR, t)
+	go.animate(id, "position.y", go.PLAYBACK_ONCE_FORWARD, to.y, go.EASING_INBACK, t)
+	go.set_scale(1.3, id)
+	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(0.45, 0.45, 1), go.EASING_INQUAD, t, 0, function() go.delete(id) end)
+end
+
+local function spark()
+	local id = factory.create(TILE_FACTORY, vmath.vector3(0, 0, 0.95))
+	sprite.play_flipbook(msg.url(nil, id, "sprite"), "spark")
+	return id
+end
+
+local function on_won(self)
+	self.finished = true
+	if self.hud:is_modal() then close_modal(self) end
+	ads.gameplay_stop()
+	ads.measure("level", tostring(self.number), "complete")
+	print("[game] level_complete " .. self.number)
+	audio.play("win")
+	self.hud:point(nil)
+	if self.number >= 2 then progress.set_tutorial_done() end
+	progress.complete_level(self.number)
+	local L = self.L
+	self.hud:banner("LEVEL COMPLETE!", palette.GOLD)
+	juice.confetti(L.loop.x + L.loop.w * 0.5, L.loop.y + L.loop.h * 0.5, 36, math.max(10, L.unit * 0.5), palette.COLORS, spark)
+	local level_done, run = self.number, self.run
+	timer.delay(config.NEXT_LEVEL_DELAY, false, function()
+		if self.run ~= run then return end -- restarted meanwhile
+		ads.level_break(level_done, function() start(self, level_done + 1) end)
+	end)
 end
 
 local function on_event(self, ev)
@@ -154,17 +324,9 @@ local function on_event(self, ev)
 		self.last_board = now
 		audio.play("board", 1 + self.streak * 0.05)
 	elseif t == "won" and not self.finished then
-		self.finished = true
-		ads.gameplay_stop()
-		ads.measure("level", tostring(self.number), "complete")
-		audio.play("win")
-		progress.complete_level()
-		timer.delay(config.NEXT_LEVEL_DELAY, false, function()
-			ads.level_break(self.number, function() start(self, progress.level()) end)
-		end)
+		on_won(self)
 	elseif t == "stuck" then
-		ads.measure("level", tostring(self.number), "stuck")
-		self.hud:show_popup(rescue_options(self))
+		on_stuck(self)
 	end
 end
 
@@ -175,32 +337,83 @@ function init(self)
 	window.set_listener(function(_, event)
 		if event == window.WINDOW_EVENT_RESIZED then relayout(self) end
 	end)
-	-- dev: dmengine --config=bus.start_level=18 opens any level without touching the save
+	-- dev: dmengine --config=bus.start_level=18 opens any level (progress still saves on win)
+	self.autoplay = sys.get_config_int("bus.autoplay", 0) == 1
 	local dev_level = sys.get_config_int("bus.start_level", 0)
 	start(self, dev_level > 0 and dev_level or progress.level())
+	-- dev: --config=bus.dev_popup=1 opens Out of Spots, =2 the "+" bay offer (screenshots)
+	print("[game] ready")
+	local dev_popup = sys.get_config_int("bus.dev_popup", 0)
+	if dev_popup == 1 then on_stuck(self) end
+	if dev_popup == 2 then offer_bay(self) end
+end
+
+-- One step from Out of Spots (one open bay left, nothing for the head): pulse the "+" bays
+local function update_warning(self)
+	local st = self.sim.st
+	local free, match = 0, false
+	local head = st.queue[st.head]
+	for _, bay in ipairs(st.bays) do
+		local b = bay.bus and st.buses[bay.bus]
+		if bay.kind == "open" and not b then free = free + 1 end
+		if b and b.color == head then match = true end
+	end
+	self.board:warn(free == 1 and not match and not self.finished and not self.hud:is_modal())
+end
+
+local function autoplay(self, dt)
+	if not self.autoplay or self.finished or self.hud:is_modal() then return end
+	self.auto_t = self.auto_t + dt
+	if self.auto_t < 0.35 then return end
+	local st = self.sim.st
+	local id = self.plan[self.plan_i]
+	local bus = id and st.buses[id]
+	if bus and bus.state ~= "lot" then
+		self.plan_i = self.plan_i + 1
+	elseif bus and rules.free_bay(st, "open") then
+		self.auto_t = 0
+		self.sim:tap(id, function(bay) return self.board:travel_time(id, bay) end)
+	end
 end
 
 function update(self, dt)
 	if ads.is_ad_active() or not self.sim then return end
+	autoplay(self, dt)
 	self.sim:update(dt)
-	for _, ev in ipairs(self.sim:drain()) do on_event(self, ev) end
+	self.board:update(dt)
+	local events = self.sim:drain()
+	for _, ev in ipairs(events) do on_event(self, ev) end
+	local was_idle = (self.idle or 0) > IDLE_HINT
+	self.idle = (self.idle or 0) + dt
+	if #events > 0 or (not was_idle and self.idle > IDLE_HINT) then
+		update_tutorial(self)
+		update_warning(self)
+		self.board:mark_free()
+	end
 	self.queue:update(dt)
 end
 
 function on_input(self, action_id, action)
 	if action_id ~= TOUCH or not action.pressed or ads.is_ad_active() then return end
-	ads.gameplay_start()
 	local x, y = action.screen_x, action.screen_y
+	if (self.idle or 0) > IDLE_HINT then
+		self.idle = 0
+		update_tutorial(self)
+	end
+	self.idle = 0
 
+	if self.finished then return true end -- level done: wait for the next one
 	local act = self.hud:pick(x, y)
 	if act then
-		if act ~= "popup_miss" then on_action(self, act) end
+		if act ~= "popup_miss" and act ~= "locked" then on_action(self, act) end
 		return true
 	end
 
+	ads.gameplay_start() -- first touch on the board (again after a popup or an ad)
+
 	local bay = self.board:pick_bay(x, y)
 	if bay and self.sim.st.bays[bay].kind == "locked" then
-		ads.rewarded(function(ok) if ok then self.sim:unlock_bay() end end)
+		offer_bay(self)
 		return true
 	end
 
@@ -211,7 +424,7 @@ function on_input(self, action_id, action)
 		self.vip_mode = false
 		refresh_hud(self)
 	else
-		self.sim:tap(bus)
+		self.sim:tap(bus, function(bay) return self.board:travel_time(bus, bay) end)
 	end
 	return true
 end

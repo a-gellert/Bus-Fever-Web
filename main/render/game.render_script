@@ -1,6 +1,6 @@
 -- Pixel-perfect 2D: world units = window pixels, origin bottom-left.
 -- modules/view/layout.lua lays out zones for whatever size the window has.
-local CLEAR = vmath.vector4(0.914, 0.933, 0.961, 1) -- palette.BACKGROUND
+local CLEAR = vmath.vector4(0.051, 0.102, 0.18, 1) -- night navy under the backdrop sprite
 
 function init(self)
 	self.tile = render.predicate({ "tile" })
