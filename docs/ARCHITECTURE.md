@@ -26,6 +26,7 @@ modules/
   view/                 Defold-side presentation, no rules
     layout.lua          portrait/landscape zones, lot->pixel transform (pure math)
     path_loop.lua       passenger path by arc length (pure math)
+    route.lua           driving route lot -> road ring -> bay, local corner fillets (pure math, tested)
     board_view.lua      backdrop, lot, bay pier, garages, vehicles + shadows; sim events -> animations; picking
     queue_view.lua      passenger crowd on a road ribbon: sprite pool, 2-3 abreast, slide on boarding, "N LEFT"
     hud.lua             header, booster buttons, modal popups, tutorial hand, win banner

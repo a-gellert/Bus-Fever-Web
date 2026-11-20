@@ -14,7 +14,6 @@ local M = {}
 M.__index = M
 
 local BUS_FACTORY = "/level#bus_factory" -- collectionfactory: /root (label) + /body (sprites) + /shadow
-local IMG_BUS = vmath.vector3(72, 36, 1)  -- bus.png / shadow.png, facing +x; body is 70x30 of it
 local IMG_ARROW = 32
 
 local Z_BACK, Z_LOT, Z_BAY, Z_BUS, Z_BUS_MOVING = -0.9, -0.5, 0.05, 0.2, 0.5
@@ -35,6 +34,12 @@ function M.new(st, L)
 	for i in ipairs(st.garages) do self.garages[i] = tile.new(Z_BUS, "garage") end
 	for _, id in ipairs(st.order) do self:spawn(id) end
 	self:relayout(L)
+	-- level start: vehicles drop in one after another
+	for i, id in ipairs(st.order) do
+		local root = self.buses[id].root
+		go.set_scale(0.01, root)
+		go.animate(root, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(1, 1, 1), go.EASING_OUTBACK, 0.3, math.min(0.6, i * 0.02))
+	end
 	return self
 end
 
@@ -44,10 +49,11 @@ local function bay_unit(L, bus)
 	return math.min(L.slot_w * 0.62 / s.wid, L.bay_unit * 3.9 / s.len)
 end
 
--- pixel size of a vehicle with lot unit `u`
+-- Sprites are drawn per length at 32 px per lot unit (bus_s/m/l), so the scale is uniform:
+-- a short bus never looks like a squashed long one.
 local function body_scale(bus, u)
-	local s = config.SIZES[bus.size]
-	return vmath.vector3(s.len * u / 70, s.wid * u * 0.92 / 30, 1)
+	local k = u / 31.5
+	return vmath.vector3(k, k, 1)
 end
 
 function M:spawn(id)
@@ -55,6 +61,9 @@ function M:spawn(id)
 	local v = { root = ids[hash("/root")], body = ids[hash("/body")], shadow = ids[hash("/shadow")] }
 	self.buses[id] = v
 	go.set(url(v.shadow, "sprite"), "tint", palette.SHADOW)
+	local size = self.st.buses[id].size
+	sprite.play_flipbook(url(v.body, "body"), "bus_" .. size)
+	sprite.play_flipbook(url(v.shadow, "sprite"), "shadow_" .. size)
 	self:paint(id)
 	return v
 end
@@ -307,7 +316,8 @@ function M:update(dt)
 		go.set(v.shadow, "euler.z", deg)
 		local g = math.max(0, (k - 0.6) / 0.4) -- shrink to bay size on the last stretch
 		local s = vmath.lerp(g, m.from, m.to)
-		go.set(url(v.body, "body"), "scale", s)
+		local w = math.sin(m.t * 26) * 0.035 * (1 - k) -- suspension wobble, settles on arrival
+		go.set(url(v.body, "body"), "scale", vmath.vector3(s.x * (1 + w), s.y * (1 - w), 1))
 		go.set(url(v.shadow, "sprite"), "scale", s)
 		-- exhaust while moving
 		m.puff_t = m.puff_t - dt
@@ -324,6 +334,9 @@ function M:update(dt)
 			elseif self.buses[id] then
 				place(self, id)
 				juice.squash(v.body, 1) -- parking bump
+				local p = go.get_position(v.root)
+				juice.confetti(p.x, p.y, 7, self.L.unit * 0.3, { palette.of(self.st.buses[id].color), palette.GOLD },
+					function() return tile.new(0.9, "star").id end, 64)
 			end
 		end
 	end
@@ -357,6 +370,7 @@ function M:on_event(ev)
 	elseif t == "blocked" then
 		local bus = self.st.buses[id]
 		juice.lurch(self.buses[id].root, bus.box.ux, bus.box.uy, math.min(ev.dist * self.L.unit, self.L.unit * 0.5))
+		juice.shake_screen(3)
 		local blocker = ev.blocker and ev.blocker > 0 and self.buses[ev.blocker]
 		if blocker then
 			juice.shake(blocker.root, self.L.unit * 0.12)
@@ -365,6 +379,7 @@ function M:on_event(ev)
 		audio.play("honk")
 	elseif t == "no_bay" then
 		for _, b in ipairs(self.bays) do juice.shake(b.id, self.L.unit * 0.1) end
+		juice.shake_screen(4)
 		audio.play("deny")
 	elseif t == "board" then
 		self:paint(id)

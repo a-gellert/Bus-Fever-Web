@@ -30,6 +30,10 @@ function M.new(L)
 	end
 	self.title = tile.new(Z)
 	self.restart = { bg = tile.new(Z), icon = tile.new(Z + 0.01, "icon_restart") }
+	self.sound = { bg = tile.new(Z), icon = tile.new(Z + 0.01, "icon_sound") }
+	self.bar_bg = tile.new(Z, "bar")
+	self.bar = tile.new(Z + 0.01, "bar")
+	self.progress = 0
 	self.hand = tile.new(0.97, "hand")
 	tile.show(self.hand, false)
 	self:relayout(L)
@@ -78,8 +82,64 @@ function M:relayout(L)
 	tile.set(self.restart.bg, { x = L.restart_pos.x, y = L.restart_pos.y, w = hs * 0.9, h = hs * 0.9, tint = palette.PANEL })
 	tile.set(self.restart.icon, { x = L.restart_pos.x, y = L.restart_pos.y, w = hs * 0.6, h = hs * 0.6, tint = palette.CREAM })
 	self.restart.rect = { x = L.restart_pos.x, y = L.restart_pos.y, w = math.max(48, hs), h = math.max(48, hs) }
-	if self.popup then self:show_popup(self.popup.title, self.popup.options) end
+	tile.set(self.sound.bg, { x = L.sound_pos.x, y = L.sound_pos.y, w = hs * 0.9, h = hs * 0.9, tint = palette.PANEL })
+	tile.set(self.sound.icon, { x = L.sound_pos.x, y = L.sound_pos.y, w = hs * 0.62, h = hs * 0.62, tint = palette.CREAM,
+		anim = audio.is_user_muted() and "icon_mute" or "icon_sound" })
+	self.sound.rect = { x = L.sound_pos.x, y = L.sound_pos.y, w = math.max(48, hs), h = math.max(48, hs) }
+	self:set_progress(self.progress)
+	if self.popup then self:show_popup(self.popup.title, self.popup.options, self.popup.info) end
 	if self.hand_target then self:point(self.hand_target.x, self.hand_target.y) end
+end
+
+-- Thin level progress bar under the title (passengers boarded / total)
+function M:set_progress(f)
+	self.progress = math.max(0, math.min(1, f or 0))
+	local L = self.L
+	local hs = L.restart_size
+	local w = math.min(L.header.w * 0.5, hs * 4.5) * 0.8
+	local h = math.max(6, hs * 0.16)
+	local y = L.title_pos.y - hs * 0.6
+	tile.set(self.bar_bg, { x = L.title_pos.x, y = y, w = w, h = h, tint = palette.PANEL })
+	local fw = math.max(h, w * self.progress)
+	tile.set(self.bar, { x = L.title_pos.x - w * 0.5 + fw * 0.5, y = y, w = fw, h = h, tint = palette.GOLD })
+	tile.show(self.bar, self.progress > 0)
+end
+
+-- Touch feedback: a ring that grows and fades where the finger landed
+function M:ripple(x, y)
+	local s = math.max(36, (self.L.unit or 30) * 1.4)
+	local t = tile.new(0.99, "ring")
+	tile.set(t, { x = x, y = y, w = s, h = s, tint = vmath.vector4(1, 1, 1, 0.55) })
+	go.set_scale(0.35, t.id)
+	go.animate(t.id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(1.1, 1.1, 1), go.EASING_OUTQUAD, 0.3)
+	go.animate(t.sprite, "tint.w", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INQUAD, 0.3, 0, function() tile.delete(t) end)
+end
+
+-- Praise for quick chains of departures: pops at (x, y) with a star, floats up, shrinks away
+function M:praise(text, x, y)
+	local L = self.L
+	local px = math.max(22, math.min(L.w * 0.08, 46))
+	local star = tile.new(0.95, "star")
+	tile.set(star, { x = x, y = y, w = px * 2.2, h = px * 2.2, tint = vmath.vector4(1, 0.82, 0.25, 0.9) })
+	if self.praised then -- only the newest praise stays on screen
+		for _, o in ipairs(self.praised) do tile.delete(o) end
+	end
+	local t = tile.new(0.96) -- label sits +0.01 above: keep it under the far plane (z < 1)
+	tile.set(t, { x = x, y = y, text = text, text_px = px, text_color = palette.GOLD })
+	self.praised = { t, star }
+	for _, o in ipairs({ t, star }) do
+		juice.pop(o.id, 1)
+		go.animate(o.id, "position.y", go.PLAYBACK_ONCE_FORWARD, y + px * 1.6, go.EASING_OUTQUAD, 0.9)
+	end
+	go.animate(star.id, "euler.z", go.PLAYBACK_ONCE_FORWARD, 120, go.EASING_OUTQUAD, 0.9)
+	timer.delay(0.7, false, function()
+		for _, o in ipairs({ t, star }) do
+			if o.alive ~= false and self.praised and (self.praised[1] == o or self.praised[2] == o) then
+				go.animate(o.id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(0.01, 0.01, 1), go.EASING_INBACK, 0.25, 0,
+					function() tile.delete(o) end)
+			end
+		end
+	end)
 end
 
 -- Returns the action name under the point, or nil. A popup swallows all taps while open.
@@ -93,6 +153,10 @@ function M:pick(x, y)
 			end
 		end
 		return "popup_miss"
+	end
+	if hit(self.sound.rect, x, y) then
+		juice.pop(self.sound.bg.id, 1)
+		return "sound"
 	end
 	if hit(self.restart.rect, x, y) then
 		juice.pop(self.restart.bg.id, 1)
@@ -114,7 +178,8 @@ function M:pick(x, y)
 end
 
 -- Modal popup. options = { {action =, text =, icon = "icon_ad"|nil, tint = vector4|nil}, ... }
-function M:show_popup(title, options)
+-- info (optional) = { icon = "icon_vip", tint = vector4, lines = { "SEND ANY BUS", "TO THE VIP SPOT" } }
+function M:show_popup(title, options, info)
 	self:hide_popup(true)
 	local L = self.L
 	local w = math.min(L.w * 0.82, 560)
@@ -122,14 +187,29 @@ function M:show_popup(title, options)
 	local items = {}
 	local dim = tile.new(Z + 0.05)
 	tile.set(dim, { x = L.w * 0.5, y = L.h * 0.5, w = L.w, h = L.h, tint = palette.DIM })
-	local total = h * 1.25 * #options + h * 1.6
+	local info_h = info and h * (1.9 + 0.62 * #info.lines) or 0
+	local total = h * 1.25 * #options + h * 1.6 + info_h
 	local panel = tile.new(Z + 0.06)
 	tile.set(panel, { x = L.w * 0.5, y = L.h * 0.5, w = w + 36, h = total + 36, tint = palette.PANEL })
 	local head = tile.new(Z + 0.07)
 	local top = L.h * 0.5 + total * 0.5
 	tile.set(head, { x = L.w * 0.5, y = top - h * 0.7, text = title, text_px = h * 0.55, text_color = palette.GOLD })
+	local extra = {}
+	if info then
+		local icon = tile.new(Z + 0.07, info.icon)
+		local s = h * 1.4
+		tile.set(icon, { x = L.w * 0.5, y = top - h * 1.5 - s * 0.5, w = s, h = s, tint = info.tint or palette.WHITE })
+		juice.pulse(icon.id, 0.08, 0.5)
+		extra[#extra + 1] = icon
+		for i, line in ipairs(info.lines) do
+			local t = tile.new(Z + 0.07)
+			tile.set(t, { x = L.w * 0.5, y = top - h * 1.6 - s - (i - 0.3) * h * 0.62, text = line, text_px = h * 0.4,
+				text_color = palette.CREAM })
+			extra[#extra + 1] = t
+		end
+	end
 	for i, o in ipairs(options) do
-		local y = top - h * 1.6 - (i - 0.5) * h * 1.25
+		local y = top - h * 1.6 - info_h - (i - 0.5) * h * 1.25
 		local bg = tile.new(Z + 0.08)
 		tile.set(bg, { x = L.w * 0.5, y = y, w = w, h = h, tint = o.tint or (i == 1 and palette.BUTTON_OK or palette.BUTTON_NEUTRAL),
 			text = o.text, text_px = h * 0.42, text_color = palette.WHITE })
@@ -141,7 +221,7 @@ function M:show_popup(title, options)
 		juice.pop(bg.id, 1)
 		items[i] = { bg = bg, icon = icon, action = o.action, rect = { x = L.w * 0.5, y = y, w = w, h = h } }
 	end
-	self.popup = { title = title, options = options, items = items, dim = dim, panel = panel, head = head }
+	self.popup = { title = title, options = options, info = info, items = items, dim = dim, panel = panel, head = head, extra = extra }
 	self:relayout_labels()
 end
 
@@ -149,6 +229,7 @@ function M:hide_popup(silent)
 	if not self.popup then return end
 	for _, o in ipairs(self.popup.items) do tile.delete(o.bg); tile.delete(o.icon) end
 	tile.delete(self.popup.dim); tile.delete(self.popup.panel); tile.delete(self.popup.head)
+	for _, t in ipairs(self.popup.extra or {}) do tile.delete(t) end
 	self.popup = nil
 	if not silent then self:relayout(self.L) end
 end
@@ -199,6 +280,7 @@ function M:delete()
 		tile.delete(b.bg); tile.delete(b.icon); tile.delete(b.badge); tile.delete(b.lock); tile.delete(b.txt)
 	end
 	tile.delete(self.title); tile.delete(self.restart.bg); tile.delete(self.restart.icon); tile.delete(self.hand)
+	tile.delete(self.sound.bg); tile.delete(self.sound.icon); tile.delete(self.bar_bg); tile.delete(self.bar)
 end
 
 return M

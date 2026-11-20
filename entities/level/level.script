@@ -102,10 +102,16 @@ local function start(self, n)
 	if self.intro_shown ~= n then -- once per level, not on every restart
 		self.intro_shown = n
 		if n == 1 then self.hud:banner("MATCH THE COLOURS!", palette.CREAM) end
-		for _, b in pairs(config.BOOSTERS) do
-			if n == b.unlock_level then self.hud:banner("NEW BOOSTER!", palette.GOLD) end
+	end
+	-- first level with a booster unlocked: explain it once (shown on the first frame, see update)
+	self.pending_intro = nil
+	for _, name in ipairs(hud_mod.BOOSTERS) do
+		if not self.pending_intro and progress.booster_unlocked(name, n) and not progress.seen(name) then
+			self.pending_intro = name
 		end
 	end
+	self.hud:set_progress(0)
+	self.departs, self.last_depart = 0, -10
 	ads.measure("level", tostring(n), "start")
 end
 
@@ -119,12 +125,12 @@ local function relayout(self)
 	self.board:mark_free()
 end
 
-local function set_modal(self, title, options)
+local function set_modal(self, title, options, info)
 	self.board:set_labels(false)
 	self.board:warn(false)
 	self.queue:set_counter_visible(false)
 	self.hud:point(nil)
-	self.hud:show_popup(title, options)
+	self.hud:show_popup(title, options, info)
 end
 
 local function close_modal(self)
@@ -221,6 +227,14 @@ local function rescued(self, how)
 end
 
 local function on_action(self, action)
+	if action == "sound" then
+		local muted = not audio.is_user_muted()
+		audio.set_user_muted(muted)
+		progress.set_muted(muted)
+		self.hud:relayout(self.L)
+		audio.play("tap")
+		return
+	end
 	if action == "restart" then
 		ads.measure("level", tostring(self.number), "restart")
 		start(self, self.number)
@@ -313,16 +327,48 @@ local function on_won(self)
 	end)
 end
 
+-- Quick chains of departures earn praise (NICE! -> AMAZING!) above the pier
+local PRAISE = { "NICE!", "GREAT!", "AWESOME!", "AMAZING!" }
+local function praise_chain(self)
+	local now = self.sim.time
+	self.departs = (now - self.last_depart < 1.8) and self.departs + 1 or 1
+	self.last_depart = now
+	local text = PRAISE[math.min(self.departs - 1, #PRAISE)]
+	if text and not self.hud:is_modal() then
+		local b = self.L.bays
+		self.hud:praise(text, b.x + b.w * 0.5, b.y - self.L.unit * 1.8) -- just below the pier
+		audio.play("unlock", 1 + self.departs * 0.08, 0.6)
+	end
+end
+
+local BOOSTER_INFO = {
+	vip = { title = "NEW: VIP", icon = "icon_vip", lines = { "SEND ANY BUS,", "EVEN A BLOCKED ONE" } },
+	arrange = { title = "NEW: SORT", icon = "icon_arrange", lines = { "SEATED PASSENGERS", "GO FIRST" } },
+	jumble = { title = "NEW: MIX", icon = "icon_jumble", lines = { "SHUFFLE COLOURS", "OF PARKED BUSES" } },
+}
+
+local function show_intro(self)
+	local name = self.pending_intro
+	self.pending_intro = nil
+	progress.set_seen(name)
+	local info = BOOSTER_INFO[name]
+	set_modal(self, info.title, { { action = "close", text = "GOT IT" } },
+		{ icon = info.icon, tint = palette.BUTTONS[name], lines = info.lines })
+end
+
 local function on_event(self, ev)
 	self.board:on_event(ev)
 	local t = ev.type
 	if t == "board" then
 		self.queue:on_board()
+		self.hud:set_progress((self.sim.st.head - 1) / #self.sim.st.queue)
 		jump(self, ev.bus, ev.color)
 		local now = self.sim.time
 		self.streak = (now - self.last_board < 0.3) and math.min(self.streak + 1, 20) or 0
 		self.last_board = now
 		audio.play("board", 1 + self.streak * 0.05)
+	elseif t == "depart" then
+		praise_chain(self)
 	elseif t == "won" and not self.finished then
 		on_won(self)
 	elseif t == "stuck" then
@@ -333,6 +379,7 @@ end
 function init(self)
 	msg.post(".", "acquire_input_focus")
 	progress.load()
+	audio.set_user_muted(progress.muted())
 	ads.set_hooks(function() audio.set_muted(true) end, function() audio.set_muted(false) end)
 	window.set_listener(function(_, event)
 		if event == window.WINDOW_EVENT_RESIZED then relayout(self) end
@@ -378,6 +425,7 @@ end
 
 function update(self, dt)
 	if ads.is_ad_active() or not self.sim then return end
+	if self.pending_intro and not self.hud:is_modal() and not self.finished and not self.autoplay then show_intro(self) end
 	autoplay(self, dt)
 	self.sim:update(dt)
 	self.board:update(dt)
@@ -396,6 +444,7 @@ end
 function on_input(self, action_id, action)
 	if action_id ~= TOUCH or not action.pressed or ads.is_ad_active() then return end
 	local x, y = action.screen_x, action.screen_y
+	self.hud:ripple(x, y)
 	if (self.idle or 0) > IDLE_HINT then
 		self.idle = 0
 		update_tutorial(self)

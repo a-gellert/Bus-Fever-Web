@@ -61,6 +61,7 @@ function M.compute(w, h, lot, n_bays)
 	L.title_pos = { x = L.header.x + L.header.w * 0.5, y = L.header.y + L.header.h * 0.5 }
 	L.restart_pos = { x = L.header.x + L.header.w - hs * 0.5, y = L.title_pos.y }
 	L.restart_size = hs
+	L.sound_pos = { x = L.header.x + hs * 0.5, y = L.title_pos.y }
 	return L
 end
 

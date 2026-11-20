@@ -8,7 +8,7 @@ local VERSION = 1
 local data
 
 local function defaults()
-	local d = { version = VERSION, level = 1, coins = 0, tutorial = false, boosters = {} }
+	local d = { version = VERSION, level = 1, coins = 0, tutorial = false, muted = false, seen = {}, boosters = {} }
 	for name, b in pairs(config.BOOSTERS) do d.boosters[name] = b.start end
 	return d
 end
@@ -27,6 +27,10 @@ function M.load()
 		d.level = int(raw.level, 1) or d.level
 		d.coins = int(raw.coins, 0) or d.coins
 		d.tutorial = raw.tutorial == true
+		d.muted = raw.muted == true
+		if type(raw.seen) == "table" then
+			for name in pairs(config.BOOSTERS) do d.seen[name] = raw.seen[name] == true end
+		end
 		if type(raw.boosters) == "table" then
 			for name in pairs(d.boosters) do
 				d.boosters[name] = int(raw.boosters[name], 0) or d.boosters[name]
@@ -44,6 +48,21 @@ function M.level() return data.level end
 -- Reaching level n+1 (never goes backwards, e.g. when replaying with a dev start level)
 function M.complete_level(n)
 	data.level = math.max(data.level, (n or data.level) + 1)
+	M.flush()
+end
+
+function M.muted() return data.muted end
+
+function M.set_muted(v)
+	data.muted = v and true or false
+	M.flush()
+end
+
+-- booster explainer shown once per booster
+function M.seen(name) return data.seen[name] == true end
+
+function M.set_seen(name)
+	data.seen[name] = true
 	M.flush()
 end
 

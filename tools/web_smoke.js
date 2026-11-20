@@ -23,6 +23,7 @@ const SCENARIOS = [
   { name: 'landscape-l18', w: 1100, h: 620, args: ['--config=bus.start_level=18'], wait: 6 },
   { name: 'desktop-l34', w: 1600, h: 900, args: ['--config=bus.start_level=34'], wait: 6 },
   { name: 'popup-stuck', w: 540, h: 960, args: ['--config=bus.start_level=9', '--config=bus.dev_popup=1'], wait: 6 },
+  { name: 'intro-l4', w: 540, h: 960, args: ['--config=bus.start_level=4'], wait: 3 },
   { name: 'popup-offer', w: 360, h: 640, args: ['--config=bus.start_level=3', '--config=bus.dev_popup=2'], wait: 6 },
   { name: 'autoplay-1-3', w: 540, h: 960, args: ['--config=bus.start_level=1', '--config=bus.autoplay=1'], wait: 30, minLevels: 2, shots: [1.5, 2.5, 4] },
   { name: 'autoplay-landscape-18', w: 1280, h: 720, args: ['--config=bus.start_level=18', '--config=bus.autoplay=1'], wait: 20, minLevels: 1, shots: [2, 3] },

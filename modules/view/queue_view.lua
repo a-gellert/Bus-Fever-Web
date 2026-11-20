@@ -14,6 +14,8 @@ local Z, Z_TRACK = 0.3, 0.0
 function M.new(st, L, shape)
 	local self = setmetatable({ st = st, shape = shape or "u", pool = {}, tints = {}, track = {}, offset = 0 }, M)
 	self.counter = tile.new(Z_TRACK + 0.01)
+	self.stop = tile.new(Z + 0.05, "stop")
+	self.time = 0
 	self:relayout(L)
 	return self
 end
@@ -58,6 +60,12 @@ function M:relayout(L)
 	local c = L.loop
 	tile.set(self.counter, { x = c.x + c.w * 0.5, y = c.y + c.h * 0.52, text = "", text_px = math.max(14, c.h * (L.w <= 400 and 0.1 or 0.12)),
 		text_color = palette.CREAM })
+	-- bus stop sign beside the head of the queue
+	local hx, hy, ha = self.path:at(0)
+	local side = (self.lanes * 0.5 + 0.9) * self.size
+	local s = math.max(28, self.size * 3.2)
+	tile.set(self.stop, { x = hx - math.sin(ha) * side, y = hy + math.cos(ha) * side + s * 0.3, w = s * 0.75, h = s,
+		tint = palette.GOLD })
 	self.counter_value = nil
 end
 
@@ -81,13 +89,17 @@ end
 
 function M:update(dt)
 	self.offset = self.offset * math.exp(-dt * 18)
+	self.time = self.time + dt
+	local bob = self.size * 0.09
 	if self.offset < 0.01 then self.offset = 0 end
 	local st = self.st
 	for i, id in ipairs(self.pool) do
 		local c = st.queue[st.head + i - 1]
 		local x, y, on = self:slot_pos(i - 1)
 		local visible = c ~= nil and on
-		go.set_position(vmath.vector3(x, y, visible and Z or -2), id) -- z -2: outside the projection
+		-- little idle hop, out of phase along the line (the crowd looks alive)
+		local hop = math.abs(math.sin(self.time * 6 + i * 0.7)) * bob
+		go.set_position(vmath.vector3(x, y + hop, visible and Z or -2), id) -- z -2: outside the projection
 		if visible and self.tints[i] ~= c then
 			self.tints[i] = c
 			go.set(msg.url(nil, id, "sprite"), "tint", palette.of(c))
@@ -111,6 +123,7 @@ function M:delete()
 	for _, id in ipairs(self.pool) do go.delete(id) end
 	for _, t in ipairs(self.track) do tile.delete(t) end
 	tile.delete(self.counter)
+	tile.delete(self.stop)
 	self.pool, self.track = {}, {}
 end
 

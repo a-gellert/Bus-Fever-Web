@@ -5,7 +5,16 @@ images {
   image: "/assets/images/backdrop.png"
 }
 images {
-  image: "/assets/images/bus.png"
+  image: "/assets/images/bar.png"
+}
+images {
+  image: "/assets/images/bus_l.png"
+}
+images {
+  image: "/assets/images/bus_m.png"
+}
+images {
+  image: "/assets/images/bus_s.png"
 }
 images {
   image: "/assets/images/disc.png"
@@ -32,7 +41,13 @@ images {
   image: "/assets/images/icon_lock.png"
 }
 images {
+  image: "/assets/images/icon_mute.png"
+}
+images {
   image: "/assets/images/icon_restart.png"
+}
+images {
+  image: "/assets/images/icon_sound.png"
 }
 images {
   image: "/assets/images/icon_vip.png"
@@ -44,12 +59,24 @@ images {
   image: "/assets/images/round.png"
 }
 images {
-  image: "/assets/images/shadow.png"
+  image: "/assets/images/shadow_l.png"
+}
+images {
+  image: "/assets/images/shadow_m.png"
+}
+images {
+  image: "/assets/images/shadow_s.png"
 }
 images {
   image: "/assets/images/slot.png"
 }
 images {
   image: "/assets/images/spark.png"
+}
+images {
+  image: "/assets/images/star.png"
+}
+images {
+  image: "/assets/images/stop.png"
 }
 extrude_borders: 2

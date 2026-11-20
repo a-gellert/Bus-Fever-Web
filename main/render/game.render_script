@@ -6,6 +6,7 @@ function init(self)
 	self.tile = render.predicate({ "tile" })
 	self.particle = render.predicate({ "particle" })
 	self.text = render.predicate({ "text" })
+	self.shake = 0 -- px, decays every frame (msg "shake" {amount = px})
 	self.clear = {
 		[graphics.BUFFER_TYPE_COLOR0_BIT] = CLEAR,
 		[graphics.BUFFER_TYPE_DEPTH_BIT] = 1,
@@ -20,7 +21,14 @@ function update(self)
 	render.clear(self.clear)
 
 	render.set_viewport(0, 0, w, h)
-	render.set_view(vmath.matrix4())
+	local view = vmath.matrix4()
+	if self.shake > 0.3 then
+		view = vmath.matrix4_translation(vmath.vector3((math.random() * 2 - 1) * self.shake, (math.random() * 2 - 1) * self.shake, 0))
+		self.shake = self.shake * 0.82
+	else
+		self.shake = 0
+	end
+	render.set_view(view)
 	render.set_projection(vmath.matrix4_orthographic(0, w, 0, h, -1, 1))
 
 	render.set_depth_mask(false)
@@ -34,4 +42,10 @@ function update(self)
 	render.draw(self.particle)
 	render.draw(self.text)
 	render.draw_debug3d()
+end
+
+function on_message(self, message_id, message)
+	if message_id == hash("shake") then
+		self.shake = math.max(self.shake, message.amount or 4)
+	end
 end

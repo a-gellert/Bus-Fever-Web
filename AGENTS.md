@@ -12,3 +12,4 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing code.
 8. **Tuning in data**: `modules/config.lua`, `modules/meta/levels.lua`.
 9. **Own identity**: no names, icons, UI or palette copied from the reference game.
 10. **Test without opening windows.** Never start `dmengine.exe` (or any game window) on the developer's desktop. Use `node tools/run_tests.js` for logic and `node tools/web_smoke.js` (headless Chrome on an HTML5 bundle) for the real game: screenshots, console errors, `bus.autoplay=1` playthroughs.
+11. **Finish = commit + push.** When a task is done and the tests pass, commit and push to the main branch (`master` on `origin`, the repository's default branch). Don't leave finished work uncommitted.

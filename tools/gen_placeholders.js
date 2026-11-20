@@ -63,30 +63,39 @@ const NAVY = hex('1b2238'), GLASS = hex('2a3a5c'), TIRE = hex('15181f');
 
 fs.mkdirSync(OUT, { recursive: true });
 
-// Bus 72x36, front = +x. Body tinted; outline, glass and tyres stay dark.
-png('bus', 72, 36, (x, y) => {
-  // tyres stick out of the sides
-  for (const wx of [17, 53]) {
-    if (rrect(x, y, wx - 5, 0.5, wx + 5, 35.5, 2) < 0 && (y < 5 || y > 31)) return [...TIRE, 1];
-  }
-  const d = rrect(x, y, 1, 3, 71, 33, 8);
-  if (d > 0) return null;
-  if (d > -2) return [...NAVY, 1];                                  // outline
-  if (rrect(x, y, 55, 7, 64, 29, 3) < 0) return [...GLASS, 1];       // windshield
-  if (rrect(x, y, 4, 9, 8, 27, 2) < 0) return [...GLASS, 1];         // rear window
-  for (const wx of [14, 24, 34, 44]) if (rrect(x, y, wx, 20.5, wx + 7.5, 28, 2) < 0) return [...GLASS, 1]; // side windows
-  if (x > 64 && (Math.abs(y - 9) < 2.2 || Math.abs(y - 27) < 2.2)) return g(1); // headlights
-  if (y < 11) return g(1);                                           // lit top bevel
-  if (y > 27) return g(0.72);                                        // shaded side
-  return g(0.9);
-});
-
-// soft blurred shadow under a bus (tinted black, alpha in code)
-png('shadow', 72, 36, (x, y) => {
-  const d = rrect(x, y, 4, 5, 68, 31, 10);
-  return d < 0 ? g(0, Math.min(1, -d / 5)) : null;
-});
-
+// Buses: one sprite per length (32 px per lot unit), so nothing is stretched. Front = +x.
+// Body tinted; outline, glass and tyres stay dark. More windows and a second rear axle on long ones.
+for (const [name, len] of [['s', 2], ['m', 3], ['l', 4]]) {
+  const W = 32 * len;
+  const wheels = len >= 4 ? [17, 31, W - 19] : [17, W - 19];
+  const nwin = len * 2 - 1;
+  const span = (W - 21) - 13;
+  const step = span / nwin;
+  png('bus_' + name, W, 36, (x, y) => {
+    for (const wx of wheels) {
+      if (rrect(x, y, wx - 5, 0.5, wx + 5, 35.5, 2) < 0 && (y < 5 || y > 31)) return [...TIRE, 1];
+    }
+    const d = rrect(x, y, 1, 3, W - 1, 33, 8);
+    if (d > 0) return null;
+    if (d > -2) return [...NAVY, 1];                                        // outline
+    if (rrect(x, y, W - 17, 7, W - 8, 29, 3) < 0) return [...GLASS, 1];      // windshield
+    if (rrect(x, y, 4, 9, 8, 27, 2) < 0) return [...GLASS, 1];               // rear window
+    for (let i = 0; i < nwin; i++) {                                         // side windows
+      const wx = 13 + i * step;
+      if (rrect(x, y, wx, 20.5, wx + step - 2.5, 28, 2) < 0) return [...GLASS, 1];
+    }
+    if (len >= 3 && rrect(x, y, W * 0.38, 6, W * 0.58, 12, 2) < 0) return g(0.8); // roof hatch
+    if (x > W - 8 && (Math.abs(y - 9) < 2.2 || Math.abs(y - 27) < 2.2)) return g(1); // headlights
+    if (y < 11) return g(1);                                                 // lit top bevel
+    if (y > 27) return g(0.72);                                              // shaded side
+    return g(0.9);
+  });
+  // soft shadow under the bus (tinted black, alpha in code)
+  png('shadow_' + name, W, 36, (x, y) => {
+    const d = rrect(x, y, 4, 5, W - 4, 31, 10);
+    return d < 0 ? g(0, Math.min(1, -d / 5)) : null;
+  });
+}
 // roof direction badge: white disc, navy arrow pointing +x
 png('arrow', 32, 32, (x, y) => {
   const d = circle(x, y, 16, 16, 15);
@@ -194,3 +203,43 @@ png('hand', 64, 64, (x, y) => {               // tutorial pointer: finger + palm
 png('spark', 16, 16, (x, y) => (rrect(x, y, 2, 2, 14, 14, 3) < 0 ? g(1) : null));
 // filled disc with a soft rim (badges)
 png('disc', 64, 64, (x, y) => (circle(x, y, 32, 32, 30.5) < 0 ? g(1) : null));
+
+// speaker (sound on / off)
+const speaker = (x, y) => (x >= 12 && x <= 22 && y >= 24 && y <= 40) ||
+  (x > 22 && x <= 36 && Math.abs(y - 32) <= 8 + (x - 22) * 0.9);
+png('icon_sound', 64, 64, (x, y) => {
+  if (speaker(x, y)) return g(1);
+  for (const r of [10, 18]) {
+    const d = Math.abs(Math.hypot(x - 36, y - 32) - r);
+    if (d < 2.6 && x > 38 && Math.abs(y - 32) < r * 0.8) return g(1);
+  }
+  return null;
+});
+png('icon_mute', 64, 64, (x, y) => {
+  if (speaker(x, y)) return g(1);
+  const a = Math.abs((x - 49) - (y - 32)), b = Math.abs((x - 49) + (y - 32));
+  if (Math.abs(x - 49) < 9 && Math.abs(y - 32) < 9 && (a < 3.2 || b < 3.2)) return g(1);
+  return null;
+});
+
+// bus stop sign: pole + board with a bus silhouette (board tinted in code, pole stays light)
+png('stop', 48, 64, (x, y) => {
+  if (Math.abs(x - 24) < 2.5 && y > 30) return g(0.85);
+  const d = rrect(x, y, 4, 2, 44, 34, 7);
+  if (d > 0) return null;
+  if (d > -2.5) return [...NAVY, 1];
+  if (rrect(x, y, 12, 10, 36, 24, 3) < 0) return [...NAVY, 1];                  // bus body
+  if (circle(x, y, 17, 26, 3) < 0 || circle(x, y, 31, 26, 3) < 0) return [...NAVY, 1]; // wheels
+  return g(1);
+});
+
+// five-point star (bursts, praise)
+png('star', 64, 64, (x, y) => {
+  const a = Math.atan2(y - 33, x - 32), r = Math.hypot(x - 32, y - 33);
+  const k = Math.cos(((a + Math.PI / 2) * 5) % (2 * Math.PI) - Math.PI) ; // 1 at tips
+  const lim = 13 + 16 * Math.pow(Math.max(0, (k + 1) / 2), 2.2);
+  return r < lim ? g(1) : null;
+});
+
+// thin rounded bar (progress), drawn as an image: 9-slice panels can't go thinner than their corners
+png('bar', 64, 16, (x, y) => (rrect(x, y, 0.5, 0.5, 63.5, 15.5, 7.5) < 0 ? g(1) : null));

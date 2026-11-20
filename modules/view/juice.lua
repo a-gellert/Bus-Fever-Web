@@ -36,6 +36,11 @@ function M.flash(sprite_url, tint)
 	go.animate(sprite_url, "tint", go.PLAYBACK_ONCE_FORWARD, tint, go.EASING_OUTQUAD, 0.25)
 end
 
+-- Small camera kick (render script shakes the view and lets it settle)
+function M.shake_screen(px)
+	msg.post("@render:", "shake", { amount = px })
+end
+
 -- Endless gentle pulse (tutorial pointer, "+" bays)
 function M.pulse(id, amount, period)
 	go.cancel_animations(id, "scale")
@@ -44,7 +49,8 @@ function M.pulse(id, amount, period)
 end
 
 -- Burst of coloured sparks from (x, y); `make()` returns a fresh sprite game object
-function M.confetti(x, y, n, size, colors, make)
+function M.confetti(x, y, n, size, colors, make, img)
+	img = img or 16 -- source sprite size, px
 	for i = 1, n do
 		local id = make()
 		local a = math.random() * math.pi * 2
@@ -53,7 +59,7 @@ function M.confetti(x, y, n, size, colors, make)
 		go.set(id, "euler.z", math.random() * 360)
 		local spr = msg.url(nil, id, "sprite")
 		go.set(spr, "tint", colors[(i - 1) % #colors + 1])
-		local s = size / 16 * (0.6 + math.random() * 0.6)
+		local s = size / img * (0.6 + math.random() * 0.6)
 		go.set(spr, "scale", vmath.vector3(s, s, 1))
 		local t = 0.7 + math.random() * 0.5
 		go.animate(id, "position", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(x + math.cos(a) * d, y + math.sin(a) * d - size * 3, 0.95),
