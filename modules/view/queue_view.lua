@@ -14,7 +14,7 @@ local Z, Z_TRACK = 0.3, 0.0
 function M.new(st, L, shape)
 	local self = setmetatable({ st = st, shape = shape or "u", pool = {}, tints = {}, track = {}, offset = 0 }, M)
 	self.counter = tile.new(Z_TRACK + 0.01)
-	self.stop = tile.new(Z + 0.05, "stop")
+	self.stop = tile.new(Z - 0.01, "stop") -- behind the crowd: never covers passengers
 	self.time = 0
 	self:relayout(L)
 	return self
@@ -43,9 +43,11 @@ end
 function M:relayout(L)
 	self.L = L
 	self.path = path_loop.in_rect(self.shape, L.loop)
-	self.lanes = L.loop.w < 420 and 2 or 3
-	self.size = math.max(9, math.min(L.loop.w, L.loop.h) * 0.058) -- passenger diameter, px
-	self.row_step = self.size * 1.12
+	self.lanes = L.loop.w < 360 and 3 or 4
+	-- big, readable passengers that fill the ribbon like the reference: size follows both
+	-- the width and the height of the loop, with a readable floor on a 360-wide phone
+	self.size = math.max(10, math.min(L.loop.w * 0.055, L.loop.h * 0.11))
+	self.row_step = self.size * 0.95
 	local rows = math.floor(self.path.length / self.row_step)
 	local want = rows * self.lanes
 	while #self.pool < want do
@@ -60,11 +62,9 @@ function M:relayout(L)
 	local c = L.loop
 	tile.set(self.counter, { x = c.x + c.w * 0.5, y = c.y + c.h * 0.52, text = "", text_px = math.max(14, c.h * (L.w <= 400 and 0.1 or 0.12)),
 		text_color = palette.CREAM })
-	-- bus stop sign beside the head of the queue
-	local hx, hy, ha = self.path:at(0)
-	local side = (self.lanes * 0.5 + 0.9) * self.size
-	local s = math.max(28, self.size * 3.2)
-	tile.set(self.stop, { x = hx - math.sin(ha) * side, y = hy + math.cos(ha) * side + s * 0.3, w = s * 0.75, h = s,
+	-- bus stop sign outside the queue, near the right curb (the reference keeps stops off the path)
+	local s = math.max(36, self.size * 3.6)
+	tile.set(self.stop, { x = c.x + c.w * 0.93, y = c.y + c.h * 0.16, w = s * 0.75, h = s,
 		tint = palette.GOLD })
 	self.counter_value = nil
 end
@@ -75,7 +75,7 @@ function M:slot_pos(i)
 	local lane = i % self.lanes - (self.lanes - 1) * 0.5
 	local x, y, a, on = self.path:at(row * self.row_step + self.offset * self.row_step / self.lanes)
 	local nx, ny = -math.sin(a), math.cos(a)
-	return x + nx * lane * self.size * 1.02, y + ny * lane * self.size * 1.02, on
+	return x + nx * lane * self.size * 0.92, y + ny * lane * self.size * 0.92, on
 end
 
 function M:on_board()
