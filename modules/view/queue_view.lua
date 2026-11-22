@@ -80,7 +80,6 @@ end
 
 function M:on_board()
 	self.offset = self.offset + 1
-	self.pulse = 1
 end
 
 function M:set_counter_visible(v)
@@ -90,12 +89,10 @@ end
 
 function M:update(dt)
 	self.offset = self.offset * math.exp(-dt * 15)
-	self.pulse = (self.pulse or 0) * math.exp(-dt * 9)
 	self.time = self.time + dt
 	local bob = self.size * 0.09
 	if self.offset < 0.01 then self.offset = 0 end
 	local st = self.st
-	local slide = math.min(1, self.offset)
 	for i, id in ipairs(self.pool) do
 		local c = st.queue[st.head + i - 1]
 		local x, y, on = self:slot_pos(i - 1)
@@ -104,9 +101,7 @@ function M:update(dt)
 		local near = i <= self.lanes * 2 and 1.25 or 1
 		local hop = math.abs(math.sin(self.time * 6 + i * 0.7)) * bob * near
 		go.set_position(vmath.vector3(x, y + hop, visible and Z or -2), id) -- z -2: outside the projection
-		-- the front rows squash forward for a moment when somebody boards
-		local squash = 1 + 0.22 * slide * (i <= self.lanes and 1.4 or 1)
-		local s = self.size / IMG * squash
+		local s = self.size / IMG
 		go.set(msg.url(nil, id, "sprite"), "scale", vmath.vector3(s, s, 1))
 		if visible and self.tints[i] ~= c then
 			self.tints[i] = c

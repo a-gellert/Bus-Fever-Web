@@ -28,7 +28,8 @@ modules/
     path_loop.lua       passenger path by arc length (pure math)
     route.lua           driving route lot -> road ring -> bay, local corner fillets (pure math, tested)
     board_view.lua      backdrop, lot, bay pier, garages, belts, barriers, vehicles; sim events -> animations; picking
-    queue_view.lua      passenger crowd on a road ribbon: sprite pool, 2-3 abreast, slide on boarding, "N LEFT"
+    queue_view.lua      passenger crowd on an open U ribbon: 3-4 abreast, big dots,
+                        distant rows beyond the pool are simply off-screen, slide on boarding, "N LEFT"
     hud.lua             header, coins, booster buttons, modal popups, tutorial hand, win banner
     tile.lua            tile prefabs: 9-slice panels, images, text (one object type for UI)
     juice.lua           squash, lurch, shake, pop, flash, pulse, confetti
@@ -73,6 +74,7 @@ input -> level.script -> sim:tap / sim:use_* -> rules (state change)
 | Initial facings retried, never flipped mid-run | a switching bus's start angle must not depend on disassembly history |
 | One scale for every bus in the waiting row | short buses stay short; the longest bus in the level sets `bay_unit`, no per-size stretching |
 | Reverse out, then sideways | a full bus backs out of its spot, turns onto the road under the pier and leaves sideways (it never drives through the passenger loop) |
+| Open U queue, capped at the pool | a closed ring compresses the inner lanes and folds distant passengers onto the head; the open U plus a fixed sprite pool keeps the far tail off-screen |
 | Long buses and belt garages | l/xl carry 16/40; some late garages show their stack on a conveyor belt (same chained rules, readable visually) |
 | Coins + rewarded ads | level wins pay coins; booster refills, extra spots and "clear spots" can be bought or earned with a video |
 | World-space HUD (not GUI) for now | one coordinate system, no dependency; swap to Druid inside `view/hud.lua` only |

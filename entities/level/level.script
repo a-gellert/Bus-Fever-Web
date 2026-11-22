@@ -97,7 +97,9 @@ local function start(self, n)
 	self.sim = sim_mod.new(levels.get(n))
 	self.L = compute_layout(self)
 	self.board = board_view.new(self.sim.st, self.L)
-	self.queue = queue_view.new(self.sim.st, self.L, n % 2 == 0 and "ring" or "u")
+	-- the reference reads as one open U: a closed ring compresses the inner lanes and makes
+	-- distant rows overlap the head, so the queue always uses the open shape
+	self.queue = queue_view.new(self.sim.st, self.L, "u")
 	self.hud = self.hud or hud_mod.new(self.L)
 	self.hud:relayout(self.L)
 	self.vip_mode = false
