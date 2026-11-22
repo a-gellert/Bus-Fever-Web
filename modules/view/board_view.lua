@@ -328,8 +328,8 @@ local function drive(self, id, time)
 		unit_to = self.L.bay_unit })
 end
 
--- Full bus leaves: reverse out of the waiting spot, turn onto the road under the row,
--- then accelerate sideways off the screen. No resizing: the bus keeps its parked scale.
+-- Full bus leaves in an L: straight back out of the waiting spot, a right-angle turn on
+-- the road under the row, then accelerate sideways off the screen. No resizing.
 local function depart(self, id, time)
 	local L = self.L
 	local bus = self.st.buses[id]
@@ -346,7 +346,7 @@ local function depart(self, id, time)
 	go.set(url(v.shadow, "sprite"), "scale", s)
 	set_size(self, id, bu)
 	start_mover(self, id, { kind = "depart", v = v, bus = bus, side = side,
-		p0 = { x = p.x, y = p.y }, p1 = { x = p.x + side * L.slot_w * 0.45, y = road_y },
+		p0 = { x = p.x, y = p.y }, p1 = { x = p.x, y = road_y },
 		exit_x = side > 0 and (L.w + L.unit * 7) or (-L.unit * 7), p1_y = road_y,
 		time = math.max(0.7, time or 0.64), t = 0, phase = 1, leaving = true })
 	go.cancel_animations(v.root, "position")
