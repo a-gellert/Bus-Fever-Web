@@ -65,9 +65,10 @@ fs.mkdirSync(OUT, { recursive: true });
 
 // Buses: one sprite per length (32 px per lot unit), so nothing is stretched. Front = +x.
 // Body tinted; outline, glass and tyres stay dark. More windows and a second rear axle on long ones.
-for (const [name, len] of [['s', 2], ['m', 3], ['l', 4]]) {
+for (const [name, len] of [['s', 2], ['m', 3], ['l', 4], ['xl', 6], ['limo', 5]]) {
   const W = 32 * len;
-  const wheels = len >= 4 ? [17, 31, W - 19] : [17, W - 19];
+  const wheels = len >= 6 ? [17, Math.round(W * 0.36), Math.round(W * 0.68), W - 19]
+    : len >= 4 ? [17, 31, W - 19] : [17, W - 19];
   const nwin = len * 2 - 1;
   const span = (W - 21) - 13;
   const step = span / nwin;
@@ -106,6 +107,18 @@ png('arrow', 32, 32, (x, y) => {
   if (x >= 7 && x < 16 && cy <= 3.2) return [...NAVY, 1];               // shaft
   return g(1);
 });
+// switching bus badge: white disc with a circular arrow (changes direction on every move)
+png('turn', 32, 32, (x, y) => {
+  const d = circle(x, y, 16, 16, 15);
+  if (d > 0) return null;
+  if (d > -1.5) return [...NAVY, 0.6];
+  const rd = Math.abs(Math.hypot(x - 16, y - 17) - 8.5);
+  const ang = Math.atan2(y - 17, x - 16);
+  if (rd < 2.2 && !(ang > -2.1 && ang < -1.0)) return [...NAVY, 1];
+  const hx = 22, hy = 8;
+  if (y >= hy - 5 && y <= hy + 5 && x >= hx - 7 && x <= hx + 2 && (x - (hx - 7)) >= Math.abs(y - hy) * 0.8) return [...NAVY, 1];
+  return g(1);
+});
 
 // passenger seen from above: body + head, dark rim, tinted
 png('dot', 32, 32, (x, y) => {
@@ -134,6 +147,36 @@ png('garage', 64, 64, (x, y) => {
   if (d > 0) return null;
   if (d > -4) return g(1);
   return g(Math.floor((y - 4) / 7) % 2 === 0 ? 0.62 : 0.5);
+});
+
+// static barrier: dark body with diagonal hazard stripes (white parts are tinted gold in code)
+png('barrier', 64, 64, (x, y) => {
+  const d = rrect(x, y, 1, 8, 63, 56, 5);
+  if (d > 0) return null;
+  if (d > -3) return [...NAVY, 1];
+  const stripe = ((x + y) % 22) < 9;
+  return stripe ? g(1) : g(0.35);
+});
+
+// conveyor belt: dark track with white chevrons (tinted in code)
+png('belt', 64, 32, (x, y) => {
+  const d = rrect(x, y, 0.5, 1.5, 63.5, 30.5, 6);
+  if (d > 0) return null;
+  if (d > -2) return [...NAVY, 1];
+  const cx = ((x - y * 0.8) % 20 + 20) % 20;
+  if (cx > 7 && cx < 12) return g(1);
+  return g(0.28);
+});
+
+// coin: white disc, navy ring and slot (tinted gold in code)
+png('coin', 64, 64, (x, y) => {
+  const d = circle(x, y, 32, 32, 29);
+  if (d > 0) return null;
+  if (d > -2.5) return [...NAVY, 1];
+  const inner = Math.abs(circle(x, y, 32, 32, 20));
+  if (inner < 2) return [...NAVY, 1];
+  if (Math.abs(x - 32) < 3 && y > 20 && y < 44) return [...NAVY, 1];
+  return g(1);
 });
 
 // full-screen vertical gradient, already coloured (night sky over the city)

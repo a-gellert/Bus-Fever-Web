@@ -58,6 +58,23 @@ function M.set_muted(v)
 	M.flush()
 end
 
+function M.coins() return data.coins end
+
+function M.add_coins(n)
+	n = math.floor(tonumber(n) or 0)
+	if n <= 0 then return end
+	data.coins = math.min(1e6, data.coins + n)
+	M.flush()
+end
+
+function M.spend_coins(n)
+	n = math.floor(tonumber(n) or 0)
+	if n <= 0 or data.coins < n then return false end
+	data.coins = data.coins - n
+	M.flush()
+	return true
+end
+
 -- booster explainer shown once per booster
 function M.seen(name) return data.seen[name] == true end
 

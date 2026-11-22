@@ -8,6 +8,8 @@ local solver = require("modules.sim.solver")
 local rng = require("modules.sim.rng")
 
 local N = tonumber(os.getenv("LEVELS") or 100)
+local START = tonumber(os.getenv("START") or 1)
+local END = tonumber(os.getenv("END") or N)
 local CANDIDATES, RUNS = 8, 12
 
 -- target casual fail rate by tooth position
@@ -15,7 +17,7 @@ local TARGET = { [0.2] = 0.15, [0.4] = 0.25, [0.6] = 0.35, [1.0] = 0.55, [0.0] =
 
 for k in pairs(levels.SEEDS) do levels.SEEDS[k] = nil end -- tune from raw seeds
 local lines = {}
-for n = 1, N do
+for n = START, math.min(END, N) do
 	local _, t = levels.difficulty(n)
 	local target = TARGET[t] or 0.3
 	if n <= 3 then target = 0 elseif n <= 6 then target = target * 0.5 end

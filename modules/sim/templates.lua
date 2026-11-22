@@ -8,11 +8,14 @@ local PI = math.pi
 local atan2 = math.atan2 or math.atan -- LuaJIT vs Lua 5.3 (tests)
 local GAP = 0.12 -- minimal clearance between parked vehicles
 
+local SIZE_ORDER = { "s", "m", "l", "xl", "limo" }
+
 local function size_of(r, weights)
 	local total = 0
-	for _, w in pairs(weights) do total = total + w end
+	for _, k in ipairs(SIZE_ORDER) do total = total + (weights[k] or 0) end
+	if total <= 0 then return "m" end
 	local x = r:float() * total
-	for _, k in ipairs({ "s", "m", "l" }) do
+	for _, k in ipairs(SIZE_ORDER) do
 		x = x - (weights[k] or 0)
 		if x < 0 then return k end
 	end

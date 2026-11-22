@@ -15,6 +15,7 @@ local Z = 0.8
 M.BOOSTERS = { "vip", "arrange", "jumble" }
 local ICONS = { vip = "icon_vip", arrange = "icon_arrange", jumble = "icon_jumble" }
 local NAMES = { vip = "VIP", arrange = "SORT", jumble = "MIX" }
+M.NAMES = NAMES
 
 local function hit(r, x, y)
 	return r and math.abs(x - r.x) <= r.w * 0.5 and math.abs(y - r.y) <= r.h * 0.5
@@ -33,6 +34,9 @@ function M.new(L)
 	self.sound = { bg = tile.new(Z), icon = tile.new(Z + 0.01, "icon_sound") }
 	self.bar_bg = tile.new(Z, "bar")
 	self.bar = tile.new(Z + 0.01, "bar")
+	self.coin = tile.new(Z + 0.01, "coin")
+	self.coin_txt = tile.new(Z + 0.02)
+	self.coin_value = 0
 	self.progress = 0
 	self.hand = tile.new(0.97, "hand")
 	tile.show(self.hand, false)
@@ -87,8 +91,26 @@ function M:relayout(L)
 		anim = audio.is_user_muted() and "icon_mute" or "icon_sound" })
 	self.sound.rect = { x = L.sound_pos.x, y = L.sound_pos.y, w = math.max(48, hs), h = math.max(48, hs) }
 	self:set_progress(self.progress)
+	self:set_coins(self.coin_value)
 	if self.popup then self:show_popup(self.popup.title, self.popup.options, self.popup.info) end
 	if self.hand_target then self:point(self.hand_target.x, self.hand_target.y) end
+end
+
+-- Coin balance under the right end of the progress bar
+function M:set_coins(n)
+	self.coin_value = n or 0
+	local L = self.L
+	local hs = L.restart_size
+	local w = math.min(L.header.w * 0.5, hs * 4.5) * 0.8
+	local s = hs * 0.34
+	local x = L.title_pos.x + w * 0.5 + s * 1.15
+	local y = L.title_pos.y - hs * 0.6
+	tile.set(self.coin, { x = x, y = y, w = s, h = s, tint = palette.GOLD })
+	local text = self.coin_value > 999 and "999" or tostring(self.coin_value)
+	tile.set(self.coin_txt, { x = x + s * 1.3, y = y, text = text, text_px = hs * 0.24, text_color = palette.CREAM })
+	local visible = not self.popup
+	tile.show(self.coin, visible)
+	tile.show(self.coin_txt, visible)
 end
 
 -- Thin level progress bar under the title (passengers boarded / total)
@@ -242,6 +264,8 @@ function M:relayout_labels()
 		tile.show(b.badge, false)
 	end
 	go.set(self.title.label, "text", "")
+	tile.show(self.coin, false)
+	tile.show(self.coin_txt, false)
 end
 
 function M:is_modal() return self.popup ~= nil end
@@ -281,6 +305,7 @@ function M:delete()
 	end
 	tile.delete(self.title); tile.delete(self.restart.bg); tile.delete(self.restart.icon); tile.delete(self.hand)
 	tile.delete(self.sound.bg); tile.delete(self.sound.icon); tile.delete(self.bar_bg); tile.delete(self.bar)
+	tile.delete(self.coin); tile.delete(self.coin_txt)
 end
 
 return M

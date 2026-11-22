@@ -8,13 +8,28 @@ images {
   image: "/assets/images/bar.png"
 }
 images {
+  image: "/assets/images/barrier.png"
+}
+images {
+  image: "/assets/images/belt.png"
+}
+images {
   image: "/assets/images/bus_l.png"
+}
+images {
+  image: "/assets/images/bus_limo.png"
 }
 images {
   image: "/assets/images/bus_m.png"
 }
 images {
   image: "/assets/images/bus_s.png"
+}
+images {
+  image: "/assets/images/bus_xl.png"
+}
+images {
+  image: "/assets/images/coin.png"
 }
 images {
   image: "/assets/images/disc.png"
@@ -62,10 +77,16 @@ images {
   image: "/assets/images/shadow_l.png"
 }
 images {
+  image: "/assets/images/shadow_limo.png"
+}
+images {
   image: "/assets/images/shadow_m.png"
 }
 images {
   image: "/assets/images/shadow_s.png"
+}
+images {
+  image: "/assets/images/shadow_xl.png"
 }
 images {
   image: "/assets/images/slot.png"
@@ -78,5 +99,8 @@ images {
 }
 images {
   image: "/assets/images/stop.png"
+}
+images {
+  image: "/assets/images/turn.png"
 }
 extrude_borders: 2

@@ -21,9 +21,18 @@ local TILE_FACTORY = "/level#tile_factory"
 local FREE_RESCUE_UNTIL = 6 -- levels with one free "+1 slot" rescue
 local on_stuck -- defined below; rescue paths reopen the popup when a rescue fails
 
+local function max_bus_len(st)
+	local m = 4
+	for _, bus in ipairs(st.buses) do m = math.max(m, config.SIZES[bus.size].len) end
+	for _, g in ipairs(st.garages) do
+		for _, spec in ipairs(g.queue) do m = math.max(m, config.SIZES[spec.size].len) end
+	end
+	return m
+end
+
 local function compute_layout(self)
 	local w, h = window.get_size()
-	return layout.compute(w, h, self.sim.st.lot, #self.sim.st.bays)
+	return layout.compute(w, h, self.sim.st.lot, #self.sim.st.bays, max_bus_len(self.sim.st))
 end
 
 local function refresh_hud(self)
@@ -37,6 +46,7 @@ local function refresh_hud(self)
 		}
 	end
 	self.hud:set(s, "LEVEL " .. self.number)
+	self.hud:set_coins(progress.coins())
 end
 
 local IDLE_HINT = 7        -- seconds without a tap before the hand shows a good move
@@ -59,9 +69,11 @@ local function update_tutorial(self)
 			return
 		end
 	end
+	local free = {}
+	for _, id in ipairs(rules.free_buses(st)) do free[id] = true end
 	for _, id in ipairs(rules.parked(st)) do
 		local bus = st.buses[id]
-		if bus.color == head and rules.exit_check(st, id) then
+		if bus.color == head and free[id] then
 			local p = self.board:bus_world_pos(id)
 			self.hud:point(p.x, p.y)
 			return
@@ -90,6 +102,7 @@ local function start(self, n)
 	self.hud:relayout(self.L)
 	self.vip_mode = false
 	self.finished = false
+	self.booster_offer = nil
 	self.free_rescue = n <= FREE_RESCUE_UNTIL
 	self.streak, self.last_board = 0, 0
 	refresh_hud(self)
@@ -141,10 +154,14 @@ local function close_modal(self)
 end
 
 local function offer_bay(self)
-	set_modal(self, "WATCH A VIDEO?", {
+	local opts = {
 		{ action = "confirm_bay", text = "+1 PARKING SLOT", icon = "icon_ad" },
 		{ action = "close", text = "NO THANKS", tint = palette.BUTTON_NEUTRAL },
-	})
+	}
+	if progress.coins() >= config.COIN_BOOSTER then
+		table.insert(opts, 2, { action = "buy_bay", text = config.COIN_BOOSTER .. " COINS", icon = "coin" })
+	end
+	set_modal(self, "NEED MORE SPOTS?", opts)
 end
 
 -- Out of Spots must never end without a popup: a failed or declined rescue brings it back
@@ -154,33 +171,43 @@ local function reopen_if_stuck(self)
 	end
 end
 
--- Spend a booster; with none in stock a rewarded ad grants one. apply() runs the effect.
+-- Spend a booster; with none in stock, offer a video or coins.
+local function apply_stock(self, name, apply)
+	if apply() then
+		progress.spend_booster(name)
+		ads.measure("booster", name, "used")
+	end
+	refresh_hud(self)
+	reopen_if_stuck(self)
+end
+
 local function with_booster(self, name, apply)
+	if name == "vip" and not rules.free_bay(self.sim.st, "vip") then return end
 	if progress.booster_count(name) > 0 then
-		if apply() then
-			progress.spend_booster(name)
-			ads.measure("booster", name, "used")
-		end
-		refresh_hud(self)
-		reopen_if_stuck(self)
+		apply_stock(self, name, apply)
 		return
 	end
-	ads.rewarded(function(ok)
-		if ok and not self.finished then
-			progress.add_booster(name, 1)
-			if apply() then
-				progress.spend_booster(name)
-				ads.measure("booster", name, "used")
-			end
-		end
-		refresh_hud(self)
-		reopen_if_stuck(self)
-	end)
+	self.booster_offer = { name = name, apply = apply }
+	local opts = {
+		{ action = "booster_ad", text = "WATCH A VIDEO", icon = "icon_ad" },
+		{ action = "close", text = "NO THANKS", tint = palette.BUTTON_NEUTRAL },
+	}
+	if progress.coins() >= config.COIN_BOOSTER then
+		table.insert(opts, 2, { action = "booster_coin", text = config.COIN_BOOSTER .. " COINS", icon = "coin" })
+	end
+	set_modal(self, "GET " .. hud_mod.NAMES[name] .. "  (" .. progress.coins() .. " COINS)", opts)
 end
 
 local function has_locked_bay(self)
 	for _, bay in ipairs(self.sim.st.bays) do
 		if bay.kind == "locked" then return true end
+	end
+	return false
+end
+
+local function has_parked(self)
+	for _, bay in ipairs(self.sim.st.bays) do
+		if bay.bus then return true end
 	end
 	return false
 end
@@ -199,6 +226,12 @@ local function rescue_options(self)
 			opts[#opts + 1] = { action = "rescue_free", text = "+1 SLOT  FREE" }
 		else
 			opts[#opts + 1] = { action = "rescue_bay", text = "+1 SLOT", icon = "icon_ad" }
+		end
+	end
+	if has_parked(self) then
+		opts[#opts + 1] = { action = "rescue_clear", text = "CLEAR SPOTS", icon = "icon_ad" }
+		if progress.coins() >= config.COIN_BOOSTER then
+			opts[#opts + 1] = { action = "rescue_clear_coins", text = config.COIN_BOOSTER .. " COINS", icon = "coin" }
 		end
 	end
 	if progress.booster_unlocked("arrange", self.number) then
@@ -239,7 +272,34 @@ local function on_action(self, action)
 		ads.measure("level", tostring(self.number), "restart")
 		start(self, self.number)
 	elseif action == "close" then
+		self.booster_offer = nil
 		close_modal(self)
+		reopen_if_stuck(self)
+	elseif action == "booster_ad" then
+		local offer = self.booster_offer
+		self.booster_offer = nil
+		if not offer then return end
+		close_modal(self)
+		ads.rewarded(function(ok)
+			if ok and not self.finished then
+				progress.add_booster(offer.name, 1)
+				apply_stock(self, offer.name, offer.apply)
+			else
+				refresh_hud(self)
+				reopen_if_stuck(self)
+			end
+		end)
+	elseif action == "booster_coin" then
+		local offer = self.booster_offer
+		self.booster_offer = nil
+		if not offer then return end
+		close_modal(self)
+		if progress.coins() >= config.COIN_BOOSTER and offer.apply() then
+			progress.spend_coins(config.COIN_BOOSTER)
+			ads.measure("booster", offer.name, "used")
+		end
+		refresh_hud(self)
+		reopen_if_stuck(self)
 	elseif action == "vip" then
 		self.vip_mode = not self.vip_mode
 		refresh_hud(self)
@@ -251,6 +311,18 @@ local function on_action(self, action)
 		self.free_rescue = false
 		self.sim:unlock_bay()
 		rescued(self, "free_bay")
+	elseif action == "rescue_clear" then
+		ads.rewarded(function(ok)
+			if ok and not self.finished and self.sim:clear_bays() then
+				rescued(self, "ad_clear")
+			end
+		end)
+	elseif action == "rescue_clear_coins" then
+		if progress.coins() >= config.COIN_BOOSTER and self.sim:clear_bays() then
+			progress.spend_coins(config.COIN_BOOSTER)
+			self.hud:set_coins(progress.coins())
+			rescued(self, "coins_clear")
+		end
 	elseif action == "rescue_bay" or action == "confirm_bay" then
 		ads.rewarded(function(ok)
 			if ok and not self.finished then
@@ -260,6 +332,12 @@ local function on_action(self, action)
 				close_modal(self)
 			end
 		end)
+	elseif action == "buy_bay" then
+		if progress.coins() >= config.COIN_BOOSTER and self.sim:unlock_bay() then
+			progress.spend_coins(config.COIN_BOOSTER)
+			self.hud:set_coins(progress.coins())
+			rescued(self, "coins_bay")
+		end
 	elseif action == "rescue_arrange" then
 		close_modal(self)
 		with_booster(self, "arrange", function() return self.sim:use_arrange() end)
@@ -285,20 +363,35 @@ local function on_action(self, action)
 	end
 end
 
-local function jump(self, bus_id, color)
-	local from = self.queue:head_pos()
-	local to = self.board:bus_world_pos(bus_id)
+local function jump(self, bus_id, color, from)
+	local board = self.board
+	local to = board:bus_world_pos(bus_id)
 	to.z = from.z
 	local id = factory.create(PASSENGER_FACTORY, from)
-	local s = self.queue.size / 32
-	go.set(msg.url(nil, id, "sprite"), "scale", vmath.vector3(s, s, 1))
-	go.set(msg.url(nil, id, "sprite"), "tint", palette.of(color))
-	-- hop: up a little, then dive into the bus while shrinking
-	local t = 0.16
-	go.animate(id, "position.x", go.PLAYBACK_ONCE_FORWARD, to.x, go.EASING_LINEAR, t)
-	go.animate(id, "position.y", go.PLAYBACK_ONCE_FORWARD, to.y, go.EASING_INBACK, t)
-	go.set_scale(1.3, id)
-	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(0.45, 0.45, 1), go.EASING_INQUAD, t, 0, function() go.delete(id) end)
+	local sprite = msg.url(nil, id, "sprite")
+	local s = math.max(0.3, self.queue.size / 32)
+	go.set(sprite, "scale", vmath.vector3(s, s, 1))
+	go.set(sprite, "tint", palette.of(color))
+	local dx, dy = to.x - from.x, to.y - from.y
+	local dist = math.sqrt(dx * dx + dy * dy)
+	local dur = 0.18 + math.min(0.1, dist / 2400)
+	local peak = math.max(from.y, to.y) + math.max(7, dist * 0.16)
+	-- a little hop out of the queue, then a dive into the bus
+	go.set(id, "euler.z", math.deg(math.atan2(dy, dx)))
+	go.animate(id, "euler.z", go.PLAYBACK_ONCE_FORWARD, math.deg(math.atan2(dy, dx)) + 110, go.EASING_OUTQUAD, dur)
+	go.animate(id, "position.x", go.PLAYBACK_ONCE_FORWARD, to.x, go.EASING_INOUTQUAD, dur)
+	go.animate(id, "position.y", go.PLAYBACK_ONCE_FORWARD, peak, go.EASING_OUTQUAD, dur * 0.55, 0, function()
+		if not go.exists(id) then return end
+		go.animate(id, "position.y", go.PLAYBACK_ONCE_FORWARD, to.y, go.EASING_INQUAD, dur * 0.45)
+	end)
+	go.set_scale(0.55, id)
+	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(1.25, 1.25, 1), go.EASING_OUTBACK, dur * 0.42, 0, function()
+		if not go.exists(id) then return end
+		go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(0.42, 0.42, 1), go.EASING_INQUAD, dur * 0.58, 0, function()
+			if go.exists(id) then go.delete(id) end
+			if self.board == board then board:board_impact(bus_id, color) end
+		end)
+	end)
 end
 
 local function spark()
@@ -317,6 +410,9 @@ local function on_won(self)
 	self.hud:point(nil)
 	if self.number >= 2 then progress.set_tutorial_done() end
 	progress.complete_level(self.number)
+	progress.add_coins(config.COIN_REWARD)
+	self.hud:set_coins(progress.coins())
+	ads.measure("coins", "level", tostring(config.COIN_REWARD))
 	local L = self.L
 	self.hud:banner("LEVEL COMPLETE!", palette.GOLD)
 	juice.confetti(L.loop.x + L.loop.w * 0.5, L.loop.y + L.loop.h * 0.5, 36, math.max(10, L.unit * 0.5), palette.COLORS, spark)
@@ -360,9 +456,10 @@ local function on_event(self, ev)
 	self.board:on_event(ev)
 	local t = ev.type
 	if t == "board" then
+		local from = self.queue:head_pos()
 		self.queue:on_board()
 		self.hud:set_progress((self.sim.st.head - 1) / #self.sim.st.queue)
-		jump(self, ev.bus, ev.color)
+		jump(self, ev.bus, ev.color, from)
 		local now = self.sim.time
 		self.streak = (now - self.last_board < 0.3) and math.min(self.streak + 1, 20) or 0
 		self.last_board = now
@@ -452,13 +549,12 @@ function on_input(self, action_id, action)
 	self.idle = 0
 
 	if self.finished then return true end -- level done: wait for the next one
+	ads.gameplay_start() -- first player input (again after a popup or an ad)
 	local act = self.hud:pick(x, y)
 	if act then
 		if act ~= "popup_miss" and act ~= "locked" then on_action(self, act) end
 		return true
 	end
-
-	ads.gameplay_start() -- first touch on the board (again after a popup or an ad)
 
 	local bay = self.board:pick_bay(x, y)
 	if bay and self.sim.st.bays[bay].kind == "locked" then

@@ -11,7 +11,9 @@ M.MIN_TEXT = 12        -- px, readable on a 360-wide phone
 
 local SIZES = { slot = { 32, 96 }, garage = 64, backdrop = { 4, 256 }, ring = 64, hand = 64, spark = 16,
 	icon_vip = 64, icon_arrange = 64, icon_jumble = 64, icon_restart = 64, icon_lock = 64, icon_ad = 64, disc = 64,
-	icon_sound = 64, icon_mute = 64, star = 64, stop = { 48, 64 }, bar = { 64, 16 } }
+	icon_sound = 64, icon_mute = 64, star = 64, stop = { 48, 64 }, bar = { 64, 16 }, barrier = 64, coin = 64,
+	belt = { 64, 32 }, bus_s = { 64, 36 }, bus_m = { 96, 36 }, bus_l = { 128, 36 },
+	bus_xl = { 192, 36 }, bus_limo = { 160, 36 } }
 
 local function img_size(anim)
 	local s = SIZES[anim] or 64
@@ -23,7 +25,7 @@ function M.new(z, anim)
 	local panel = anim == nil or anim == "round"
 	local id = factory.create(panel and PANEL_FACTORY or TILE_FACTORY, vmath.vector3(0, 0, z or 0))
 	local t = { id = id, sprite = msg.url(nil, id, "sprite"), label = msg.url(nil, id, "label"),
-		anim = panel and "round" or "round", panel = panel, visible = true }
+		anim = "round", panel = panel, visible = true }
 	if anim and not panel then M.anim(t, anim) end
 	return t
 end

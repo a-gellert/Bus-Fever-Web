@@ -41,14 +41,15 @@ local function gap_ahead(o, b)
 	return max(0, near - front)
 end
 
--- Exit check. `obstacles` must not contain `o` itself.
+-- Exit check. `obstacles` must not contain `o` itself. `skip` (optional) is a box to ignore,
+-- which lets callers test every box against one shared obstacle list.
 -- Returns nil when the way is clear, else (index of nearest blocker, free distance to it).
-function M.first_hit(o, obstacles, dist)
+function M.first_hit(o, obstacles, dist, skip)
 	local sw = M.swept(o, dist)
 	local best, best_d
 	for i = 1, #obstacles do
 		local b = obstacles[i]
-		if M.overlap(sw, b, -M.EPS) then
+		if b ~= skip and M.overlap(sw, b, -M.EPS) then
 			local d = gap_ahead(o, b)
 			if not best_d or d < best_d then best, best_d = i, d end
 		end

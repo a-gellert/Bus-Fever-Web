@@ -60,7 +60,15 @@ local function key(st)
 	for _, b in ipairs(inbay) do parts[#parts + 1] = b.id .. ":" .. b.left end
 	parts[#parts + 1] = "|"
 	for _, id in ipairs(st.order) do
-		if st.buses[id].state == "lot" then parts[#parts + 1] = id end
+		local bus = st.buses[id]
+		if bus.state == "lot" then
+			-- switching buses change orientation, so it is part of the position
+			if bus.turning then
+				parts[#parts + 1] = id .. "@" .. string.format("%.2f", bus.box.angle)
+			else
+				parts[#parts + 1] = id
+			end
+		end
 	end
 	return table.concat(parts, ",")
 end
@@ -93,10 +101,8 @@ function M.solve(st, budget)
 		if nodes > budget then exhausted = true return false end
 
 		local cands = {}
-		for _, id in ipairs(rules.parked(s)) do
-			if rules.exit_check(s, id) then
-				cands[#cands + 1] = { id = id, u = urgency(s, s.buses[id]) }
-			end
+		for _, id in ipairs(rules.free_buses(s)) do
+			cands[#cands + 1] = { id = id, u = urgency(s, s.buses[id]) }
 		end
 		table.sort(cands, function(a, b) if a.u ~= b.u then return a.u < b.u end return a.id < b.id end)
 		for _, c in ipairs(cands) do
@@ -129,18 +135,16 @@ function M.play_casual(st, rng, look, noise)
 		local bay = rules.free_bay(s, "open")
 		if not bay then return false end
 		local best, best_u
-		for _, id in ipairs(rules.parked(s)) do
-			if rules.exit_check(s, id) then
-				local bus = s.buses[id]
-				local u = look
-				if not bus.hidden then
-					for i = s.head, math.min(#s.queue, s.head + look - 1) do
-						if s.queue[i] == bus.color then u = i - s.head break end
-					end
+		for _, id in ipairs(rules.free_buses(s)) do
+			local bus = s.buses[id]
+			local u = look
+			if not bus.hidden then
+				for i = s.head, math.min(#s.queue, s.head + look - 1) do
+					if s.queue[i] == bus.color then u = i - s.head break end
 				end
-				u = u + rng:float() * noise
-				if not best_u or u < best_u then best, best_u = id, u end
 			end
+			u = u + rng:float() * noise
+			if not best_u or u < best_u then best, best_u = id, u end
 		end
 		if not best then return false end
 		rules.send(s, best, bay)

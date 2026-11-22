@@ -10,8 +10,9 @@ end
 
 M.N_BUTTONS = 3 -- boosters; restart lives in the header
 
--- lot = {w, h} in lot units; n_bays = bays on screen (vip + open + locked)
-function M.compute(w, h, lot, n_bays)
+-- lot = {w, h} in lot units; n_bays = bays on screen (vip + open + locked);
+-- max_len = longest bus in the level (lot units), so a long bus fits a waiting spot without scaling
+function M.compute(w, h, lot, n_bays, max_len)
 	local L = { w = w, h = h, portrait = h >= w * 1.15 }
 	local screen = rect(0, 0, w, h)
 	if L.portrait then
@@ -43,7 +44,9 @@ function M.compute(w, h, lot, n_bays)
 	L.bay_pos = {}
 	local slot_w = L.bays.w / n_bays
 	L.slot_w = slot_w
-	L.bay_unit = math.min(slot_w / 1.2, L.bays.h / 4.3) -- a long bus (4 units) fits a bay
+	L.max_bus_len = math.max(2, max_len or 4)
+	-- one shared scale for every bus in the row; it fits the longest vehicle of this level
+	L.bay_unit = math.min(slot_w / 1.2, L.bays.h / (L.max_bus_len + 0.35))
 	for i = 1, n_bays do
 		L.bay_pos[i] = { x = L.bays.x + slot_w * (i - 0.5), y = L.bays.y + L.bays.h * 0.5 }
 	end

@@ -4,8 +4,9 @@
 --
 -- Level data (from level_gen or hand-made):
 --   { lot = {w=, h=}, bays = {open=, locked=, vip=bool},
---     buses   = { {x=, y=, angle=, size="s|m|l", color=, hidden=bool} },
+--     buses   = { {x=, y=, angle=, size="s|m|l|xl|limo", color=, hidden=bool, turning=bool} },
 --     garages = { {x=, y=, angle=, len=, wid=, queue = { {size=, color=, hidden=} } } },
+--     barriers = { {x=, y=, angle=, len=, wid=} },
 --     queue   = { color, color, ... } }   -- passengers, head first
 --
 -- Bus states: "lot" -> "to_bay" -> "bay" -> "full" -> "gone"
@@ -19,7 +20,7 @@ local function add_bus(st, spec, x, y, angle, garage)
 	st.next_id = st.next_id + 1
 	local bus = {
 		id = st.next_id, size = spec.size, cap = size.cap, left = size.cap, color = spec.color,
-		hidden = spec.hidden or false, garage = garage, state = "lot",
+		hidden = spec.hidden or false, turning = spec.turning or false, garage = garage, state = "lot",
 		box = geometry.box(x, y, angle, size.len, size.wid),
 	}
 	st.buses[bus.id] = bus
@@ -48,7 +49,7 @@ function M.new(level)
 	local st = {
 		lot = { w = level.lot.w, h = level.lot.h },
 		buses = {}, order = {}, next_id = 0,
-		garages = {}, bays = {},
+		garages = {}, barriers = {}, bays = {},
 		queue = {}, head = 1,
 	}
 	for i = 1, #level.queue do st.queue[i] = level.queue[i] end
@@ -58,12 +59,16 @@ function M.new(level)
 	for _ = 1, b.open do st.bays[#st.bays + 1] = { kind = "open" } end
 	for _ = 1, b.locked or 0 do st.bays[#st.bays + 1] = { kind = "locked" } end
 
+	for i, spec in ipairs(level.barriers or {}) do
+		st.barriers[i] = { x = spec.x, y = spec.y, angle = spec.angle, len = spec.len, wid = spec.wid,
+			box = geometry.box(spec.x, spec.y, spec.angle, spec.len, spec.wid) }
+	end
 	for _, spec in ipairs(level.buses) do add_bus(st, spec, spec.x, spec.y, spec.angle) end
 	local ev = {}
 	for gi, g in ipairs(level.garages or {}) do
 		local q = {}
 		for i, spec in ipairs(g.queue) do q[i] = spec end
-		st.garages[gi] = { x = g.x, y = g.y, angle = g.angle, len = g.len, wid = g.wid, queue = q,
+		st.garages[gi] = { x = g.x, y = g.y, angle = g.angle, len = g.len, wid = g.wid, belt = g.belt, queue = q,
 			box = geometry.box(g.x, g.y, g.angle, g.len, g.wid) }
 		garage_pop(st, gi, ev)
 	end
@@ -71,7 +76,7 @@ function M.new(level)
 	return st
 end
 
--- Boxes that block driving: parked buses (except `skip`) and garage bodies
+-- Boxes that block driving: parked buses (except `skip`), garage bodies and barriers
 function M.obstacles(st, skip)
 	local list, owners = {}, {}
 	for _, id in ipairs(st.order) do
@@ -85,10 +90,14 @@ function M.obstacles(st, skip)
 		list[#list + 1] = g.box
 		owners[#list] = -gi
 	end
+	for wi, w in ipairs(st.barriers) do
+		list[#list + 1] = w.box
+		owners[#list] = -1000 - wi -- negative, distinct from garage ids; the view ignores it
+	end
 	return list, owners
 end
 
--- true if the bus can leave the lot; otherwise false, blocker id (negative = garage), free distance
+-- true if the bus can leave the lot; otherwise false, blocker id (negative = garage/barrier), free distance
 function M.exit_check(st, id)
 	local bus = st.buses[id]
 	local obs, owners = M.obstacles(st, id)
@@ -97,15 +106,57 @@ function M.exit_check(st, id)
 	return false, owners[hit], dist
 end
 
--- Hidden buses show their colour once their exit is clear
-function M.reveal(st, events)
+-- All buses that can leave right now. Builds the obstacle list once, so solver and casual
+-- player avoid an O(n) rebuild for every candidate bus.
+function M.free_buses(st)
+	local obs = M.obstacles(st)
+	local dist = geometry.exit_distance({ hl = 0, hw = 0 }, st.lot.w, st.lot.h)
+	local out = {}
 	for _, id in ipairs(st.order) do
 		local bus = st.buses[id]
-		if bus.state == "lot" and bus.hidden and M.exit_check(st, id) then
-			bus.hidden = false
-			events[#events + 1] = { type = "reveal", bus = id, color = bus.color }
+		if bus.state == "lot" then
+			local d = dist + 2 * bus.box.hl
+			if not geometry.first_hit(bus.box, obs, d, bus.box) then out[#out + 1] = id end
 		end
 	end
+	return out
+end
+
+-- Hidden buses show their colour once their exit is clear
+function M.reveal(st, events)
+	local any = false
+	for _, id in ipairs(st.order) do
+		if st.buses[id].state == "lot" and st.buses[id].hidden then any = true break end
+	end
+	if not any then return end
+	local obs = M.obstacles(st)
+	local dist = geometry.exit_distance({ hl = 0, hw = 0 }, st.lot.w, st.lot.h)
+	for _, id in ipairs(st.order) do
+		local bus = st.buses[id]
+		if bus.state == "lot" and bus.hidden then
+			local d = dist + 2 * bus.box.hl
+			if not geometry.first_hit(bus.box, obs, d, bus.box) then
+				bus.hidden = false
+				events[#events + 1] = { type = "reveal", bus = id, color = bus.color }
+			end
+		end
+	end
+end
+
+-- Switching buses (the round arrow) turn 90 degrees whenever another bus is sent out.
+-- They are part of the puzzle: the same tap can open one lane and close another.
+function M.rotate_turners(st, events)
+	local any = false
+	for _, id in ipairs(st.order) do
+		local bus = st.buses[id]
+		if bus.state == "lot" and bus.turning then
+			local size = config.SIZES[bus.size]
+			bus.box = geometry.box(bus.box.x, bus.box.y, bus.box.angle + math.pi * 0.5, size.len, size.wid)
+			events[#events + 1] = { type = "turn", bus = id, angle = bus.box.angle }
+			any = true
+		end
+	end
+	return any
 end
 
 function M.free_bay(st, kind)
@@ -132,6 +183,7 @@ function M.send(st, id, bay_index)
 	st.seq = (st.seq or 0) + 1
 	bus.seq = st.seq -- boarding priority = tap order, never bay position or timing
 	st.bays[bay_index].bus = id
+	M.rotate_turners(st, events) -- before a garage spawns its next bus
 	if bus.garage then
 		st.garages[bus.garage].current = nil
 		garage_pop(st, bus.garage, events)
@@ -169,6 +221,21 @@ function M.depart(st, id)
 	local bus = st.buses[id]
 	st.bays[bus.bay].bus = nil
 	bus.state = "gone"
+end
+
+-- Rescue: send every parked bus away and free the whole waiting row. Their passengers stay
+-- in the queue, so the rescue gives room to act but does not guarantee a win.
+function M.clear_bays(st)
+	local cleared = {}
+	for i, bay in ipairs(st.bays) do
+		local bus = bay.bus and st.buses[bay.bus]
+		if bus then
+			bay.bus = nil
+			bus.state = "gone"
+			cleared[#cleared + 1] = { id = bus.id, bay = i }
+		end
+	end
+	return cleared
 end
 
 function M.passengers_left(st)

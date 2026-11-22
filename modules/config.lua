@@ -5,16 +5,23 @@ local M = {}
 M.COLOR_COUNT = 9
 
 -- Vehicle sizes in lot units (1 unit = one lane width).
+-- l/xl are the long "party" buses: more seats, harder to place and to free.
 M.SIZES = {
 	s = { len = 2, wid = 1, cap = 4 },
 	m = { len = 3, wid = 1, cap = 8 },
-	l = { len = 4, wid = 1, cap = 12 },
+	l = { len = 4, wid = 1, cap = 16 },
+	xl = { len = 6, wid = 1, cap = 40 }, -- long party bus
+	limo = { len = 5, wid = 1, cap = 6 }, -- business vehicle: long body, only six seats
 }
 
 -- Waiting row
 M.BAYS_OPEN = 4
-M.BAYS_LOCKED = 2         -- unlocked per level by a rewarded ad
+M.BAYS_LOCKED = 3         -- unlocked per level by a rewarded ad / coins
 M.HAS_VIP_BAY = true
+
+-- Coins (earned per level, spent on booster refills and "+" spots)
+M.COIN_REWARD = 20
+M.COIN_BOOSTER = 80
 
 -- Timing (seconds) — the sim owns time, the view only animates towards it
 M.DRIVE_TIME = 0.45       -- lot -> bay

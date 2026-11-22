@@ -43,6 +43,7 @@ local function dispatch(self, id, bay, kind, travel)
 	push_all(self, rules.send(self.st, id, bay))
 	push(self, { type = kind, bus = id, bay = bay, time = travel })
 	after(self, travel, function()
+		if self.st.buses[id].state == "gone" then return end -- cleared by a rescue meanwhile
 		rules.arrive(self.st, id)
 		push(self, { type = "arrive", bus = id, bay = bay })
 	end)
@@ -114,6 +115,18 @@ function M:unlock_bay()
 	return true
 end
 
+-- Rescue: every parked bus leaves, all waiting spots become free. Passengers keep waiting.
+function M:clear_bays()
+	if self.result == "won" then return false end
+	local cleared = rules.clear_bays(self.st)
+	if #cleared == 0 then return false end
+	for _, c in ipairs(cleared) do
+		push(self, { type = "depart", bus = c.id, bay = c.bay, time = config.DEPART_TIME })
+	end
+	self.result = nil
+	return true
+end
+
 local function run_timers(self)
 	local i = 1
 	while i <= #self.timers do
@@ -142,6 +155,7 @@ local function board(self, dt)
 		if bus.left == 0 then
 			push(self, { type = "full", bus = id })
 			after(self, config.DEPART_DELAY, function()
+				if bus.state ~= "full" then return end -- cleared by a rescue meanwhile
 				local bay = bus.bay
 				rules.depart(self.st, id)
 				push(self, { type = "depart", bus = id, bay = bay, time = config.DEPART_TIME })

@@ -1,6 +1,6 @@
 # Release checklist (Poki)
 
-Status 2026-11-20: feature-complete for a first Poki submission. Checked headlessly; no real-device test yet.
+Status 2026-11-22: MVP + party mechanics. Checked headlessly; no real-device test yet.
 
 ## Done
 
@@ -12,8 +12,12 @@ Status 2026-11-20: feature-complete for a first Poki submission. Checked headles
 - [x] Zero-friction start: level 1 opens directly, with a tutorial hand on the right bus
 - [x] Levels 1–3 can't be lost; levels 1–6 have one free rescue
 - [x] Every campaign level is solvable without boosters, also for a fast real-time player (`tests/test_replay.lua`)
-- [x] Sawtooth difficulty, tuned per level (casual-player fail rate: breather 4%, peak 52%)
+- [x] Sawtooth difficulty, tuned per level (casual-player fail rate: breather 7%, rising 13/26/37%, peak 60%)
 - [x] Portrait and landscape layouts; 360x640 phone checked
+- [x] Party mechanics: up to 8 waiting spots, two garages, belt stacks, hidden colours, static barriers, switching buses, long 16/40-seat buses, limousines
+- [x] Filled buses reverse out of the waiting spot, turn onto the road and leave sideways
+- [x] One shared bus scale in the waiting row: short buses are not stretched to fill a slot
+- [x] Coins for level wins; booster refills, extra spots and "clear spots" for coins or a rewarded video
 - [x] Own name, palette, font and UI (Poki "inspired, not imitated")
 - [x] Bundle: about 1.7 MB gzipped / 3.3 MB raw for the browser (single-threaded wasm)
 - [x] Headless smoke on the HTML5 build: no console errors, autoplay clears levels (`tools/web_smoke.js`)

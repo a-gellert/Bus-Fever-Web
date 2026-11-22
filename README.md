@@ -6,6 +6,8 @@ Web-first parking puzzle for HTML5 portals (Poki first). Tap a vehicle whose way
 - Bundle: about 3.3 MB downloaded by the player
 - Portrait and landscape, mouse and touch
 - Every campaign level can be finished without boosters (checked by tests)
+- Party mechanics: long 16/40-seat buses, two garages, belt stacks, hidden colours, static barriers, switching buses, 8 waiting spots, coins
+- Filled buses reverse out of the spot and leave along the road; every bus keeps its own length (no stretching to fit a slot)
 
 ## Run
 
@@ -24,7 +26,7 @@ Dev options (engine `--config=...`; in the browser smoke test as `?arg=--config=
 
 ```
 cd tools && npm install           # once: fengari (Lua in Node) for tests
-node tools/run_tests.js           # sim tests: geometry, rules, solvable levels, real-time replay, boosters, difficulty
+node tools/run_tests.js           # sim tests: geometry, rules, mechanics, solvable levels, real-time replay, boosters, difficulty
 node tools/tune_levels.js 100     # re-pick level seeds against the difficulty targets (minutes)
 node tools/gen_placeholders.js    # regenerate sprites
 node tools/gen_sounds.js          # regenerate sound effects
