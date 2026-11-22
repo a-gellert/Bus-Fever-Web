@@ -20,7 +20,7 @@ show_fullscreen_button = 0
 show_made_with_defold = 0
 
 [project]
-title = Park & Pop
+title = ParkPop
 dependencies#0 = https://github.com/defold/extension-poki-sdk/archive/refs/tags/4.1.0.zip
 
 [collection]
@@ -40,3 +40,4 @@ max_count = 16
 
 [sound]
 max_sound_instances = 48
+
