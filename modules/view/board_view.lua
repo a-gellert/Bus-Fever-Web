@@ -28,6 +28,7 @@ function M.new(st, L)
 	self.lot = tile.new(Z_LOT)
 	self.pier_rim = tile.new(Z_BAY - 0.03)
 	self.pier = tile.new(Z_BAY - 0.02)
+	self.road_rings = { tile.new(Z_LOT + 0.01, "ring"), tile.new(Z_LOT + 0.01, "ring") }
 	for i, bay in ipairs(st.bays) do
 		self.bays[i] = tile.new(Z_BAY, "slot")
 		self.bay_ads[i] = tile.new(Z_BAY + 0.01, "icon_ad")
@@ -58,7 +59,6 @@ function M:spawn(id)
 	self.buses[id] = v
 	go.set(url(v.shadow, "sprite"), "tint", palette.SHADOW)
 	local bus = self.st.buses[id]
-	sprite.play_flipbook(url(v.body, "body"), "bus_" .. bus.size)
 	sprite.play_flipbook(url(v.shadow, "sprite"), "shadow_" .. bus.size)
 	sprite.play_flipbook(url(v.body, "roof"), bus.turning and "turn" or "arrow")
 	self:paint(id)
@@ -68,11 +68,18 @@ end
 function M:paint(id)
 	local bus, v = self.st.buses[id], self.buses[id]
 	if not v then return end
-	go.set(url(v.body, "body"), "tint", bus.hidden and palette.HIDDEN or palette.of(bus.color))
-	local roof = bus.hidden and vmath.vector4(1, 1, 1, 0.5) or (bus.turning and palette.TURN or palette.WHITE)
+	local anim = "bus_" .. bus.size
+	if bus.hidden then
+		anim = anim .. "_hidden"
+	elseif bus.color then
+		anim = anim .. "_" .. bus.color
+	end
+	sprite.play_flipbook(url(v.body, "body"), anim)
+	go.set(url(v.body, "body"), "tint", palette.WHITE)
+	local roof = bus.hidden and vmath.vector4(1, 1, 1, 0) or palette.WHITE
 	go.set(url(v.body, "roof"), "tint", roof)
 	local text = ""
-	if bus.hidden then text = "?" elseif bus.state ~= "lot" and bus.left > 0 then text = tostring(bus.left) end
+	if bus.state ~= "lot" and bus.left > 0 then text = tostring(bus.left) end
 	go.set(url(v.root, "count"), "text", self.labels and text or "")
 end
 
@@ -122,17 +129,21 @@ function M:paint_bays()
 	local n = #self.st.bays
 	local pw, ph = L.slot_w * n + L.slot_w * 0.2, L.bay_unit * (L.max_bus_len + 0.4)
 	local px, py = L.bays.x + L.bays.w * 0.5, L.bays.y + L.bays.h * 0.5
-	tile.set(self.pier_rim, { x = px, y = py, w = pw + 4, h = ph + 4, tint = palette.PIER_RIM })
+	tile.set(self.pier_rim, { x = px, y = py, w = pw + 6, h = ph + 6, tint = palette.PIER_RIM })
 	tile.set(self.pier, { x = px, y = py, w = pw, h = ph, tint = palette.PANEL })
 	for i, bay in ipairs(self.st.bays) do
 		local p = L.bay_pos[i]
-		local tint, text = palette.BAY, ""
-		if bay.kind == "vip" then tint, text = palette.BAY_VIP, "VIP" end
-		if bay.kind == "locked" then tint, text = palette.BAY_LOCKED, "+" end
+		local anim, tint, text = "slot", palette.WHITE, ""
+		if bay.kind == "vip" then
+			anim, text = "slot_vip", "VIP"
+		elseif bay.kind == "locked" then
+			anim, text = "slot_locked", ""
+		end
 		local w, h = math.max(L.slot_w * 0.8, 20), L.bay_unit * (L.max_bus_len + 0.1)
-		tile.set(self.bays[i], { x = p.x, y = p.y, w = w, h = h, tint = tint,
-			text = self.labels and text or "", text_px = math.min(w * (bay.kind == "vip" and 0.42 or 0.7), h * 0.3),
-			text_color = bay.kind == "locked" and palette.GOLD or palette.WHITE })
+		tile.set(self.bays[i], { x = p.x, y = p.y, w = w, h = h, anim = anim, tint = tint,
+			text = self.labels and (bay.kind ~= "locked" and text or "") or "",
+			text_px = math.min(w * (bay.kind == "vip" and 0.42 or 0.7), h * 0.3),
+			text_color = bay.kind == "vip" and palette.GOLD or palette.WHITE })
 		local ad = self.bay_ads[i]
 		local s = math.min(w * 0.8, h * 0.3)
 		tile.set(ad, { x = p.x, y = p.y - h * 0.28, w = s, h = s, tint = palette.GOLD })
@@ -205,6 +216,9 @@ function M:relayout(L)
 	local pad = L.unit * 0.35
 	tile.set(self.lot_border, { x = cx, y = cy, w = lw + pad * 2 + 6, h = lh + pad * 2 + 6, tint = palette.LOT_BORDER })
 	tile.set(self.lot, { x = cx, y = cy, w = lw + pad * 2, h = lh + pad * 2, tint = palette.ASPHALT })
+	local min_dim = math.min(lw, lh)
+	tile.set(self.road_rings[1], { x = cx, y = cy, w = min_dim * 0.48, h = min_dim * 0.48, tint = vmath.vector4(1, 1, 1, 0.4) })
+	tile.set(self.road_rings[2], { x = cx, y = cy, w = min_dim * 0.82, h = min_dim * 0.82, tint = vmath.vector4(1, 1, 1, 0.4) })
 	self:paint_bays()
 	self:paint_garages()
 	self:paint_barriers()
@@ -558,7 +572,7 @@ function M:delete()
 	for _, list in pairs(self.belt_ghosts) do
 		for _, t in ipairs(list) do tile.delete(t) end
 	end
-	for _, t in ipairs({ self.backdrop, self.lot_border, self.lot, self.pier, self.pier_rim }) do tile.delete(t) end
+	for _, t in ipairs({ self.backdrop, self.lot_border, self.lot, self.pier, self.pier_rim, self.road_rings[1], self.road_rings[2] }) do tile.delete(t) end
 end
 
 return M

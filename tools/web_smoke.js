@@ -10,6 +10,7 @@ const path = require('path');
 const puppeteer = require('puppeteer-core');
 
 const BROWSERS = [
+  path.join(process.env.LOCALAPPDATA || '', 'ms-playwright/chromium-1255/chrome-win64/chrome.exe'),
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe',

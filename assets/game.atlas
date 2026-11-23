@@ -17,16 +17,166 @@ images {
   image: "/assets/images/bus_l.png"
 }
 images {
+  image: "/assets/images/bus_l_1.png"
+}
+images {
+  image: "/assets/images/bus_l_2.png"
+}
+images {
+  image: "/assets/images/bus_l_3.png"
+}
+images {
+  image: "/assets/images/bus_l_4.png"
+}
+images {
+  image: "/assets/images/bus_l_5.png"
+}
+images {
+  image: "/assets/images/bus_l_6.png"
+}
+images {
+  image: "/assets/images/bus_l_7.png"
+}
+images {
+  image: "/assets/images/bus_l_8.png"
+}
+images {
+  image: "/assets/images/bus_l_9.png"
+}
+images {
+  image: "/assets/images/bus_l_hidden.png"
+}
+images {
   image: "/assets/images/bus_limo.png"
+}
+images {
+  image: "/assets/images/bus_limo_1.png"
+}
+images {
+  image: "/assets/images/bus_limo_2.png"
+}
+images {
+  image: "/assets/images/bus_limo_3.png"
+}
+images {
+  image: "/assets/images/bus_limo_4.png"
+}
+images {
+  image: "/assets/images/bus_limo_5.png"
+}
+images {
+  image: "/assets/images/bus_limo_6.png"
+}
+images {
+  image: "/assets/images/bus_limo_7.png"
+}
+images {
+  image: "/assets/images/bus_limo_8.png"
+}
+images {
+  image: "/assets/images/bus_limo_9.png"
+}
+images {
+  image: "/assets/images/bus_limo_hidden.png"
 }
 images {
   image: "/assets/images/bus_m.png"
 }
 images {
+  image: "/assets/images/bus_m_1.png"
+}
+images {
+  image: "/assets/images/bus_m_2.png"
+}
+images {
+  image: "/assets/images/bus_m_3.png"
+}
+images {
+  image: "/assets/images/bus_m_4.png"
+}
+images {
+  image: "/assets/images/bus_m_5.png"
+}
+images {
+  image: "/assets/images/bus_m_6.png"
+}
+images {
+  image: "/assets/images/bus_m_7.png"
+}
+images {
+  image: "/assets/images/bus_m_8.png"
+}
+images {
+  image: "/assets/images/bus_m_9.png"
+}
+images {
+  image: "/assets/images/bus_m_hidden.png"
+}
+images {
   image: "/assets/images/bus_s.png"
 }
 images {
+  image: "/assets/images/bus_s_1.png"
+}
+images {
+  image: "/assets/images/bus_s_2.png"
+}
+images {
+  image: "/assets/images/bus_s_3.png"
+}
+images {
+  image: "/assets/images/bus_s_4.png"
+}
+images {
+  image: "/assets/images/bus_s_5.png"
+}
+images {
+  image: "/assets/images/bus_s_6.png"
+}
+images {
+  image: "/assets/images/bus_s_7.png"
+}
+images {
+  image: "/assets/images/bus_s_8.png"
+}
+images {
+  image: "/assets/images/bus_s_9.png"
+}
+images {
+  image: "/assets/images/bus_s_hidden.png"
+}
+images {
   image: "/assets/images/bus_xl.png"
+}
+images {
+  image: "/assets/images/bus_xl_1.png"
+}
+images {
+  image: "/assets/images/bus_xl_2.png"
+}
+images {
+  image: "/assets/images/bus_xl_3.png"
+}
+images {
+  image: "/assets/images/bus_xl_4.png"
+}
+images {
+  image: "/assets/images/bus_xl_5.png"
+}
+images {
+  image: "/assets/images/bus_xl_6.png"
+}
+images {
+  image: "/assets/images/bus_xl_7.png"
+}
+images {
+  image: "/assets/images/bus_xl_8.png"
+}
+images {
+  image: "/assets/images/bus_xl_9.png"
+}
+images {
+  image: "/assets/images/bus_xl_hidden.png"
 }
 images {
   image: "/assets/images/coin.png"
@@ -36,6 +186,33 @@ images {
 }
 images {
   image: "/assets/images/dot.png"
+}
+images {
+  image: "/assets/images/dot_1.png"
+}
+images {
+  image: "/assets/images/dot_2.png"
+}
+images {
+  image: "/assets/images/dot_3.png"
+}
+images {
+  image: "/assets/images/dot_4.png"
+}
+images {
+  image: "/assets/images/dot_5.png"
+}
+images {
+  image: "/assets/images/dot_6.png"
+}
+images {
+  image: "/assets/images/dot_7.png"
+}
+images {
+  image: "/assets/images/dot_8.png"
+}
+images {
+  image: "/assets/images/dot_9.png"
 }
 images {
   image: "/assets/images/garage.png"
@@ -90,6 +267,12 @@ images {
 }
 images {
   image: "/assets/images/slot.png"
+}
+images {
+  image: "/assets/images/slot_locked.png"
+}
+images {
+  image: "/assets/images/slot_vip.png"
 }
 images {
   image: "/assets/images/spark.png"

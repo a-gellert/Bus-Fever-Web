@@ -25,9 +25,9 @@ local function build_track(self)
 	self.track = {}
 	local width = self.size * (self.lanes + 0.6)
 	local step = width * 0.5
-	-- two layers: a lighter edge under the road so it reads on the navy backdrop
+	-- two layers: a fresh mint-green meadow edge under the clean white walking ribbon
 	for layer = 1, 2 do
-		local pad = layer == 1 and 4 or 0
+		local pad = layer == 1 and 6 or 0
 		local d = 0
 		while d < self.path.length do
 			local x, y, a = self.path:at(d)
@@ -105,7 +105,8 @@ function M:update(dt)
 		go.set(msg.url(nil, id, "sprite"), "scale", vmath.vector3(s, s, 1))
 		if visible and self.tints[i] ~= c then
 			self.tints[i] = c
-			go.set(msg.url(nil, id, "sprite"), "tint", palette.of(c))
+			sprite.play_flipbook(msg.url(nil, id, "sprite"), "dot_" .. c)
+			go.set(msg.url(nil, id, "sprite"), "tint", palette.WHITE)
 		end
 	end
 	local left = #st.queue - st.head + 1

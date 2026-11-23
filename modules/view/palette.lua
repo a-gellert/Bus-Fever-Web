@@ -1,4 +1,4 @@
--- Colour ids (sim) -> tints (view). "Night city" identity: candy-neon vehicles on dark navy.
+-- Colour ids (sim) -> tints (view). Fresh, bright, modern 3D casual palette matching reference.
 local M = {}
 
 local function hex(s, a)
@@ -8,43 +8,43 @@ M.hex = hex
 
 -- vehicle / passenger colours, hue families kept far apart
 M.COLORS = {
-	hex("ff4d6d"), -- coral
-	hex("22d3ee"), -- electric cyan
-	hex("ffc933"), -- warm lemon
-	hex("5fd94a"), -- green (well away from lemon)
-	hex("9d6bff"), -- violet
-	hex("ff5cc8"), -- hot pink
-	hex("ff8a1f"), -- orange
-	hex("3b6cff"), -- deep blue
-	hex("f1f5f9"), -- pearl
+	hex("ff4757"), -- coral red
+	hex("1e90ff"), -- sky blue / cyan
+	hex("ffa502"), -- warm sunshine yellow
+	hex("2ed573"), -- lime green
+	hex("9c88ff"), -- cheerful violet
+	hex("ff70a6"), -- bubblegum pink
+	hex("ff7f50"), -- tangerine orange
+	hex("3742fa"), -- deep cobalt
+	hex("f1f2f6"), -- pearl white
 }
-M.HIDDEN = hex("5d5a8a")
+M.HIDDEN = hex("353b48")
 M.WHITE = hex("ffffff")
-M.SHADOW = hex("000000", 0.35)
+M.SHADOW = vmath.vector4(0, 0, 0, 0.35)
 
-M.LOT_BORDER = hex("4a5a7a")
-M.ASPHALT = hex("2c3a52")
-M.PANEL = hex("1a2440", 0.92)
-M.TRACK = hex("2b3a63") -- solid: overlapping ribbon pieces must not add up
-M.TRACK_EDGE = hex("3e5086")
-M.BAY = hex("5c70a6")
-M.BAY_VIP = hex("ffd23f")
-M.BAY_LOCKED = hex("6b7796")
-M.GARAGE = hex("3b2a6b")
-M.BARRIER = hex("ffb020")
-M.BELT = hex("55d6be")
-M.TURN = hex("b98cff")
-M.GOLD = hex("ffd23f")
-M.BADGE = hex("e8344e")
-M.PIER_RIM = hex("4a5c8f")
-M.CREAM = hex("fff4d6")
-M.DIM = hex("05080f", 0.7)
+M.LOT_BORDER = hex("7b8fa7")
+M.ASPHALT = hex("9bb0c6")
+M.PANEL = hex("8fa3b8")
+M.TRACK = hex("ffffff") -- clean white queue path
+M.TRACK_EDGE = hex("85d4ac") -- fresh meadow mint curb
+M.BAY = hex("7b8fa7")
+M.BAY_VIP = hex("ffa502")
+M.BAY_LOCKED = hex("2ed573")
+M.GARAGE = hex("8854d0")
+M.BARRIER = hex("ffa502")
+M.BELT = hex("2ed573")
+M.TURN = hex("9c88ff")
+M.GOLD = hex("ffa502")
+M.BADGE = hex("ff4757")
+M.PIER_RIM = hex("72869e")
+M.CREAM = hex("f8f9fa")
+M.DIM = vmath.vector4(0.08, 0.12, 0.18, 0.7)
 
 -- booster buttons: one accent each; restart stays neutral
-M.BUTTONS = { vip = hex("ffb020"), arrange = hex("22b8e0"), jumble = hex("ff5c8a") }
-M.BUTTON_OFF = hex("3a4466")
-M.BUTTON_OK = hex("4ade80")
-M.BUTTON_NEUTRAL = hex("5a6a92")
+M.BUTTONS = { vip = hex("ffa502"), arrange = hex("ff4757"), jumble = hex("2ed573") }
+M.BUTTON_OFF = hex("95a5a6")
+M.BUTTON_OK = hex("2ed573")
+M.BUTTON_NEUTRAL = hex("576574")
 
 function M.of(id) return M.COLORS[id] or M.HIDDEN end
 

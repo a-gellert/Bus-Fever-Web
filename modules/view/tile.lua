@@ -9,7 +9,7 @@ local TILE_FACTORY = "/level#tile_factory"
 local FONT_PX = 40     -- assets/fonts/main.font size
 M.MIN_TEXT = 12        -- px, readable on a 360-wide phone
 
-local SIZES = { slot = { 32, 96 }, garage = 64, backdrop = { 4, 256 }, ring = 64, hand = 64, spark = 16,
+local SIZES = { slot = { 32, 96 }, slot_vip = { 32, 96 }, slot_locked = { 32, 96 }, garage = 64, backdrop = { 4, 256 }, ring = 64, hand = 64, spark = 16,
 	icon_vip = 64, icon_arrange = 64, icon_jumble = 64, icon_restart = 64, icon_lock = 64, icon_ad = 64, disc = 64,
 	icon_sound = 64, icon_mute = 64, star = 64, stop = { 48, 64 }, bar = { 64, 16 }, barrier = 64, coin = 64,
 	belt = { 64, 32 }, bus_s = { 64, 36 }, bus_m = { 96, 36 }, bus_l = { 128, 36 },

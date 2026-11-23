@@ -84,10 +84,10 @@ function M:relayout(L)
 	tile.set(self.title, { x = L.title_pos.x, y = L.title_pos.y, w = math.min(L.header.w * 0.5, hs * 4.5), h = hs * 0.86,
 		tint = palette.PANEL, text = self.popup and "" or (self.title_text or ""), text_px = hs * 0.5, text_color = palette.CREAM })
 	tile.set(self.restart.bg, { x = L.restart_pos.x, y = L.restart_pos.y, w = hs * 0.9, h = hs * 0.9, tint = palette.PANEL })
-	tile.set(self.restart.icon, { x = L.restart_pos.x, y = L.restart_pos.y, w = hs * 0.6, h = hs * 0.6, tint = palette.CREAM })
+	tile.set(self.restart.icon, { x = L.restart_pos.x, y = L.restart_pos.y, w = hs * 0.6, h = hs * 0.6, tint = palette.WHITE })
 	self.restart.rect = { x = L.restart_pos.x, y = L.restart_pos.y, w = math.max(48, hs), h = math.max(48, hs) }
 	tile.set(self.sound.bg, { x = L.sound_pos.x, y = L.sound_pos.y, w = hs * 0.9, h = hs * 0.9, tint = palette.PANEL })
-	tile.set(self.sound.icon, { x = L.sound_pos.x, y = L.sound_pos.y, w = hs * 0.62, h = hs * 0.62, tint = palette.CREAM,
+	tile.set(self.sound.icon, { x = L.sound_pos.x, y = L.sound_pos.y, w = hs * 0.62, h = hs * 0.62, tint = palette.WHITE,
 		anim = audio.is_user_muted() and "icon_mute" or "icon_sound" })
 	self.sound.rect = { x = L.sound_pos.x, y = L.sound_pos.y, w = math.max(48, hs), h = math.max(48, hs) }
 	self:set_progress(self.progress)
