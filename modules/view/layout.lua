@@ -18,9 +18,9 @@ function M.compute(w, h, lot, n_bays, max_len)
 	if L.portrait then
 		-- the lot gets the most height: it is where the decisions are
 		L.header = sub(screen, 0.03, 0.948, 0.94, 0.047)
-		L.loop = sub(screen, 0.04, 0.745, 0.92, 0.2)
-		L.bays = sub(screen, 0.03, 0.64, 0.94, 0.09)
-		L.lot = sub(screen, 0.025, 0.122, 0.95, 0.465) -- leaves a road between the lot and the pier
+		L.loop = sub(screen, 0.04, 0.75, 0.92, 0.195)
+		L.bays = sub(screen, 0.03, 0.635, 0.94, 0.105)
+		L.lot = sub(screen, 0.025, 0.122, 0.95, 0.455) -- leaves a road between the lot and the pier
 		L.buttons = sub(screen, 0.04, 0.01, 0.92, 0.1)
 	else
 		-- very wide windows: keep the play area at most 2:1 and centre it
@@ -29,8 +29,8 @@ function M.compute(w, h, lot, n_bays, max_len)
 		local left, right = sub(play, 0.02, 0.03, 0.58, 0.94), sub(play, 0.62, 0.03, 0.36, 0.94)
 		L.lot = left
 		L.header = sub(right, 0, 0.92, 1, 0.08)
-		L.loop = sub(right, 0, 0.52, 1, 0.38)
-		L.bays = sub(right, 0, 0.35, 1, 0.14)
+		L.loop = sub(right, 0, 0.535, 1, 0.365)
+		L.bays = sub(right, 0, 0.345, 1, 0.165)
 		L.buttons = sub(right, 0, 0.02, 1, 0.15)
 	end
 

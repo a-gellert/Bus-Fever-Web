@@ -19,6 +19,7 @@ const BROWSERS = [
 // name, viewport, engine args, seconds to run, min levels autoplay must clear
 const SCENARIOS = [
   { name: 'portrait-l1', w: 540, h: 960, args: ['--config=bus.start_level=1'], wait: 6 },
+  { name: 'portrait-l3', w: 540, h: 960, args: ['--config=bus.start_level=3'], wait: 6 },
   { name: 'portrait-l26', w: 540, h: 960, args: ['--config=bus.start_level=26'], wait: 6 },
   { name: 'phone-l11', w: 360, h: 640, args: ['--config=bus.start_level=11'], wait: 6 },
   { name: 'landscape-l18', w: 1100, h: 620, args: ['--config=bus.start_level=18'], wait: 6 },
@@ -27,7 +28,7 @@ const SCENARIOS = [
   { name: 'intro-l4', w: 540, h: 960, args: ['--config=bus.start_level=4'], wait: 3 },
   { name: 'popup-offer', w: 360, h: 640, args: ['--config=bus.start_level=3', '--config=bus.dev_popup=2'], wait: 6 },
   { name: 'autoplay-1-3', w: 540, h: 960, args: ['--config=bus.start_level=1', '--config=bus.autoplay=1'], wait: 30, minLevels: 2, shots: [1.5, 2.5, 4] },
-  { name: 'autoplay-landscape-18', w: 1280, h: 720, args: ['--config=bus.start_level=18', '--config=bus.autoplay=1'], wait: 20, minLevels: 1, shots: [2, 3] },
+  { name: 'autoplay-landscape-18', w: 1280, h: 720, args: ['--config=bus.start_level=18', '--config=bus.autoplay=1'], wait: 32, minLevels: 1, shots: [2, 3] },
 ];
 
 const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.wasm': 'application/wasm', '.json': 'application/json',

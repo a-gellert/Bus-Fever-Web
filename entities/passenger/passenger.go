@@ -1,14 +1,21 @@
 embedded_components {
-  id: "sprite"
-  type: "sprite"
-  data: "default_animation: \"dot\"\n"
-  "material: \"/builtins/materials/sprite.material\"\n"
-  "textures {\n"
-  "  sampler: \"texture_sampler\"\n"
-  "  texture: \"/assets/game.atlas\"\n"
+  id: "model"
+  type: "model"
+  data: "mesh: \"/assets/models/passenger.glb\"\n"
+  "name: \"passenger\"\n"
+  "materials {\n"
+  "  name: \"default\"\n"
+  "  material: \"/assets/materials/stylized3d.material\"\n"
+  "  textures {\n"
+  "    sampler: \"tex0\"\n"
+  "    texture: \"/assets/images/palette_3d.png\"\n"
+  "  }\n"
   "}\n"
   ""
-  position {
-    z: 0
+  rotation {
+    x: 0.70710677
+    y: 0.0
+    z: 0.0
+    w: 0.70710677
   }
 }

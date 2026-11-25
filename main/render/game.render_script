@@ -1,12 +1,19 @@
--- Pixel-perfect 2D: world units = window pixels, origin bottom-left.
--- modules/view/layout.lua lays out zones for whatever size the window has.
-local CLEAR = vmath.vector4(0.051, 0.102, 0.18, 1) -- night navy under the backdrop sprite
+-- 3D diorama world pass + 2D orthographic HUD pass.
+-- World ground uses flat painter order, 3D meshes use depth test, world overlays sit on top,
+-- and HUD renders crisp in screen-space pixel coordinates.
+local camera3d = require("modules.view.camera3d")
+
+local CLEAR = vmath.vector4(0.82, 0.86, 0.91, 1) -- cool slate horizon
 
 function init(self)
+	self.ground_bg = render.predicate({ "ground_bg" })
+	self.ground_mid = render.predicate({ "ground_mid" })
 	self.tile = render.predicate({ "tile" })
+	self.model = render.predicate({ "model" })
+	self.overlay = render.predicate({ "overlay" })
 	self.particle = render.predicate({ "particle" })
-	self.text = render.predicate({ "text" })
-	self.shake = 0 -- px, decays every frame (msg "shake" {amount = px})
+	self.hud = render.predicate({ "hud" })
+	self.shake = 0
 	self.clear = {
 		[graphics.BUFFER_TYPE_COLOR0_BIT] = CLEAR,
 		[graphics.BUFFER_TYPE_DEPTH_BIT] = 1,
@@ -19,28 +26,49 @@ function update(self)
 	render.set_depth_mask(true)
 	render.set_stencil_mask(0xff)
 	render.clear(self.clear)
-
 	render.set_viewport(0, 0, w, h)
-	local view = vmath.matrix4()
+
+	-- 1. 3D Diorama World Pass
+	local view, proj = camera3d.matrices(w, h)
 	if self.shake > 0.3 then
-		view = vmath.matrix4_translation(vmath.vector3((math.random() * 2 - 1) * self.shake, (math.random() * 2 - 1) * self.shake, 0))
+		local sx = (math.random() * 2 - 1) * self.shake
+		local sy = (math.random() * 2 - 1) * self.shake
+		view = vmath.matrix4_translation(vmath.vector3(sx, sy, 0)) * view
 		self.shake = self.shake * 0.82
 	else
 		self.shake = 0
 	end
 	render.set_view(view)
-	render.set_projection(vmath.matrix4_orthographic(0, w, 0, h, -1, 1))
+	render.set_projection(proj)
 
-	render.set_depth_mask(false)
-	render.disable_state(graphics.STATE_DEPTH_TEST)
 	render.disable_state(graphics.STATE_STENCIL_TEST)
 	render.disable_state(graphics.STATE_CULL_FACE)
 	render.enable_state(graphics.STATE_BLEND)
 	render.set_blend_func(graphics.BLEND_FACTOR_SRC_ALPHA, graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
 
+	-- Ground plane sprites in strict layer order (bg -> mid curbs/road/lot -> top walkway/bays/shadows)
+	render.set_depth_mask(false)
+	render.disable_state(graphics.STATE_DEPTH_TEST)
+	render.draw(self.ground_bg)
+	render.draw(self.ground_mid)
 	render.draw(self.tile)
+
+	-- True 3D meshes (buses, passengers, garages, barriers, park props)
+	render.set_depth_mask(true)
+	render.enable_state(graphics.STATE_DEPTH_TEST)
+	render.draw(self.model)
+
+	-- World-space overlays (bus roof arrows, world counts, sparks, puffs)
+	render.set_depth_mask(false)
+	render.enable_state(graphics.STATE_DEPTH_TEST)
+	render.draw(self.overlay)
 	render.draw(self.particle)
-	render.draw(self.text)
+
+	-- 2. Orthographic 2D HUD Pass (header, buttons, coins, popups, hand)
+	render.set_view(vmath.matrix4())
+	render.set_projection(vmath.matrix4_orthographic(0, w, 0, h, -1, 1))
+	render.disable_state(graphics.STATE_DEPTH_TEST)
+	render.draw(self.hud)
 	render.draw_debug3d()
 end
 

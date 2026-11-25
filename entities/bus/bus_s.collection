@@ -1,0 +1,34 @@
+name: "bus_s"
+instances {
+  id: "root"
+  prototype: "/entities/bus/bus_root.go"
+  children: "body"
+  children: "badge"
+  children: "shadow"
+}
+instances {
+  id: "body"
+  prototype: "/entities/bus/bus_body.go"
+  children: "mesh"
+  children: "top"
+}
+instances {
+  id: "mesh"
+  prototype: "/entities/bus/bus_mesh_s.go"
+}
+instances {
+  id: "top"
+  prototype: "/entities/bus/bus_top.go"
+}
+instances {
+  id: "badge"
+  prototype: "/entities/bus/bus_badge.go"
+}
+instances {
+  id: "shadow"
+  prototype: "/entities/bus/bus_shadow.go"
+  position {
+    z: 0.02
+  }
+}
+scale_along_z: 1

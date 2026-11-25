@@ -1,11 +1,11 @@
 -- Game feel helpers on go.animate: squash & stretch, lurch, shake, pop, flash, pulse, confetti.
 local M = {}
 
--- One squash per boarded passenger (go scale; base 1)
+-- One squash per boarded passenger (3D-safe uniform base scale)
 function M.squash(id, base_scale)
 	go.cancel_animations(id, "scale")
-	go.set_scale(vmath.vector3(base_scale * 1.1, base_scale * 0.88, 1), id)
-	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(base_scale, base_scale, 1), go.EASING_OUTBACK, 0.12)
+	go.set_scale(vmath.vector3(base_scale * 1.12, base_scale * 0.90, base_scale * 0.90), id)
+	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(base_scale, base_scale, base_scale), go.EASING_OUTBACK, 0.12)
 end
 
 -- Blocked bus: lurch `dist` px along (dx, dy) and spring back
@@ -26,7 +26,7 @@ end
 function M.pop(id, base_scale)
 	go.cancel_animations(id, "scale")
 	go.set_scale(base_scale * 0.6, id)
-	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(base_scale, base_scale, 1), go.EASING_OUTBACK, 0.25)
+	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(base_scale, base_scale, base_scale), go.EASING_OUTBACK, 0.25)
 end
 
 -- White flash on a sprite, back to `tint`

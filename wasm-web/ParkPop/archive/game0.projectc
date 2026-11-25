@@ -113,11 +113,11 @@ game_binding = /input/game.input_bindingc
 use_accelerometer = 0
 
 [sprite]
-max_count = 2048
+max_count = 4096
 subpixels = 1
 
 [model]
-max_count = 128
+max_count = 512
 split_meshes = 0
 max_bone_matrix_texture_width = 1024
 max_bone_matrix_texture_height = 1024
@@ -148,7 +148,7 @@ max_count = 8
 max_count = 128
 
 [factory]
-max_count = 16
+max_count = 32
 
 [ios]
 home_indicator_mode = deferred
@@ -225,7 +225,7 @@ include_dirs =
 defold_min_version = 
 
 [label]
-max_count = 512
+max_count = 2048
 subpixels = 1
 
 [profiler]

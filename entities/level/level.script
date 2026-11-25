@@ -14,10 +14,11 @@ local hud_mod = require("modules.view.hud")
 local palette = require("modules.view.palette")
 local audio = require("modules.view.audio")
 local juice = require("modules.view.juice")
+local camera3d = require("modules.view.camera3d")
 
 local TOUCH = hash("touch")
 local PASSENGER_FACTORY = "/level#passenger_factory"
-local TILE_FACTORY = "/level#tile_factory"
+local HUD_TILE_FACTORY = "/level#hud_tile_factory"
 local FREE_RESCUE_UNTIL = 6 -- levels with one free "+1 slot" rescue
 local on_stuck -- defined below; rescue paths reopen the popup when a rescue fails
 
@@ -75,7 +76,8 @@ local function update_tutorial(self)
 		local bus = st.buses[id]
 		if bus.color == head and free[id] then
 			local p = self.board:bus_world_pos(id)
-			self.hud:point(p.x, p.y)
+			local sx, sy = camera3d.world_to_screen(self.L.w, self.L.h, p.x, p.y, self.L.unit * 0.6)
+			self.hud:point(sx, sy)
 			return
 		end
 	end
@@ -97,9 +99,11 @@ local function start(self, n)
 	self.sim = sim_mod.new(levels.get(n))
 	self.L = compute_layout(self)
 	self.board = board_view.new(self.sim.st, self.L)
-	-- the reference reads as one open U: a closed ring compresses the inner lanes and makes
-	-- distant rows overlap the head, so the queue always uses the open shape
-	self.queue = queue_view.new(self.sim.st, self.L, "u")
+	-- Queue shapes cycle across levels: horseshoe (u), roundabout loop,
+	-- butterfly wings (double lobes), figure-8 (infinity), serpentine S-curve
+	local QUEUE_SHAPES = { "u", "loop", "butterfly", "figure8", "snake" }
+	local shape = QUEUE_SHAPES[(n - 1) % #QUEUE_SHAPES + 1]
+	self.queue = queue_view.new(self.sim.st, self.L, shape)
 	self.hud = self.hud or hud_mod.new(self.L)
 	self.hud:relayout(self.L)
 	self.vip_mode = false
@@ -368,29 +372,26 @@ end
 local function jump(self, bus_id, color, from)
 	local board = self.board
 	local to = board:bus_world_pos(bus_id)
-	to.z = from.z
 	local id = factory.create(PASSENGER_FACTORY, from)
-	local spr_url = msg.url(nil, id, "sprite")
-	local s = math.max(0.3, self.queue.size / 32)
-	go.set(spr_url, "scale", vmath.vector3(s, s, 1))
-	sprite.play_flipbook(spr_url, "dot_" .. color)
-	go.set(spr_url, "tint", palette.WHITE)
+	local s = math.max(12, self.queue.size * 1.30)
+	go.set(msg.url(nil, id, "model"), "tint", palette.of(color))
 	local dx, dy = to.x - from.x, to.y - from.y
 	local dist = math.sqrt(dx * dx + dy * dy)
 	local dur = 0.18 + math.min(0.1, dist / 2400)
-	local peak = math.max(from.y, to.y) + math.max(7, dist * 0.16)
-	-- a little hop out of the queue, then a dive into the bus
-	go.set(id, "euler.z", math.deg(math.atan2(dy, dx)))
-	go.animate(id, "euler.z", go.PLAYBACK_ONCE_FORWARD, math.deg(math.atan2(dy, dx)) + 110, go.EASING_OUTQUAD, dur)
+	local peak_z = math.max(from.z, self.queue.size * 2.2) + math.max(12, dist * 0.18)
+	local ang = math.deg(math.atan2(dy, dx))
+	go.set(id, "euler.z", ang)
+	go.animate(id, "euler.z", go.PLAYBACK_ONCE_FORWARD, ang + 140, go.EASING_OUTQUAD, dur)
 	go.animate(id, "position.x", go.PLAYBACK_ONCE_FORWARD, to.x, go.EASING_INOUTQUAD, dur)
-	go.animate(id, "position.y", go.PLAYBACK_ONCE_FORWARD, peak, go.EASING_OUTQUAD, dur * 0.55, 0, function()
+	go.animate(id, "position.y", go.PLAYBACK_ONCE_FORWARD, to.y, go.EASING_INOUTQUAD, dur)
+	go.animate(id, "position.z", go.PLAYBACK_ONCE_FORWARD, peak_z, go.EASING_OUTQUAD, dur * 0.5, 0, function()
 		if not go.exists(id) then return end
-		go.animate(id, "position.y", go.PLAYBACK_ONCE_FORWARD, to.y, go.EASING_INQUAD, dur * 0.45)
+		go.animate(id, "position.z", go.PLAYBACK_ONCE_FORWARD, self.L.bay_unit * 0.45, go.EASING_INQUAD, dur * 0.5)
 	end)
-	go.set_scale(0.55, id)
-	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(1.25, 1.25, 1), go.EASING_OUTBACK, dur * 0.42, 0, function()
+	go.set_scale(vmath.vector3(s * 0.75, s * 0.75, s * 0.75), id)
+	go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(s * 1.15, s * 1.15, s * 1.15), go.EASING_OUTBACK, dur * 0.42, 0, function()
 		if not go.exists(id) then return end
-		go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(0.42, 0.42, 1), go.EASING_INQUAD, dur * 0.58, 0, function()
+		go.animate(id, "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(s * 0.45, s * 0.45, s * 0.45), go.EASING_INQUAD, dur * 0.58, 0, function()
 			if go.exists(id) then go.delete(id) end
 			if self.board == board then board:board_impact(bus_id, color) end
 		end)
@@ -398,7 +399,7 @@ local function jump(self, bus_id, color, from)
 end
 
 local function spark()
-	local id = factory.create(TILE_FACTORY, vmath.vector3(0, 0, 0.95))
+	local id = factory.create(HUD_TILE_FACTORY, vmath.vector3(0, 0, 0.90))
 	sprite.play_flipbook(msg.url(nil, id, "sprite"), "spark")
 	return id
 end
@@ -435,7 +436,8 @@ local function praise_chain(self)
 	local text = PRAISE[math.min(self.departs - 1, #PRAISE)]
 	if text and not self.hud:is_modal() then
 		local b = self.L.bays
-		self.hud:praise(text, b.x + b.w * 0.5, b.y - self.L.unit * 1.8) -- just below the pier
+		local sx, sy = camera3d.world_to_screen(self.L.w, self.L.h, b.x + b.w * 0.5, b.y - self.L.unit * 1.6, 0)
+		self.hud:praise(text, sx, sy)
 		audio.play("unlock", 1 + self.departs * 0.08, 0.6)
 	end
 end
@@ -511,7 +513,7 @@ end
 local function autoplay(self, dt)
 	if not self.autoplay or self.finished or self.hud:is_modal() then return end
 	self.auto_t = self.auto_t + dt
-	if self.auto_t < 0.35 then return end
+	if self.auto_t < 0.14 then return end
 	local st = self.sim.st
 	local id = self.plan[self.plan_i]
 	local bus = id and st.buses[id]

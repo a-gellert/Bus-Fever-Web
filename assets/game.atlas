@@ -286,4 +286,36 @@ images {
 images {
   image: "/assets/images/turn.png"
 }
+images {
+  image: "/assets/images/ui_badge.png"
+}
+images {
+  image: "/assets/images/ui_bar.png"
+}
+images {
+  image: "/assets/images/ui_btn_gold.png"
+}
+images {
+  image: "/assets/images/ui_btn_green.png"
+}
+images {
+  image: "/assets/images/ui_btn_grey.png"
+}
+images {
+  image: "/assets/images/ui_card.png"
+}
+images {
+  image: "/assets/images/ui_card_off.png"
+}
+images {
+  image: "/assets/images/ui_modal.png"
+}
+images {
+  image: "/assets/images/ui_modal_head.png"
+}
+images {
+  image: "/assets/images/ui_pill.png"
+}
+margin: 0
 extrude_borders: 2
+inner_padding: 0
